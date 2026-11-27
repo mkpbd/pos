@@ -3,6 +3,7 @@
 use App\Modules\Inventory\Presentation\Http\Controllers\AdjustmentController;
 use App\Modules\Inventory\Presentation\Http\Controllers\ReorderRuleController;
 use App\Modules\Inventory\Presentation\Http\Controllers\ReplenishmentSettingsController;
+use App\Modules\Inventory\Presentation\Http\Controllers\SerialController;
 use App\Modules\Inventory\Presentation\Http\Controllers\StockController;
 use App\Modules\Inventory\Presentation\Http\Controllers\StocktakeController;
 use App\Modules\Inventory\Presentation\Http\Controllers\TransferController;
@@ -13,6 +14,11 @@ Route::prefix('inventory')->middleware(['auth:sanctum', 'tenant'])->group(functi
     Route::get('batches', [StockController::class, 'batches'])->middleware('can:inventory.view');
     Route::get('movements', [StockController::class, 'movements'])->middleware('can:inventory.view');
     Route::get('valuation', [StockController::class, 'valuation'])->middleware(['can:inventory.view', 'can:products.view_cost']);
+
+    // ST2d: serial-number register.
+    Route::get('serials', [SerialController::class, 'index'])->middleware('can:inventory.view');
+    Route::get('serials/{serial}', [SerialController::class, 'show'])->whereUuid('serial')->middleware('can:inventory.view');
+    Route::get('stores/{store}/serials', [SerialController::class, 'inStock'])->whereUuid('store')->middleware('can:inventory.view');
 
     Route::get('adjustments', [AdjustmentController::class, 'index'])->middleware('can:inventory.view');
     Route::post('adjustments', [AdjustmentController::class, 'store'])->middleware('can:inventory.adjust');

@@ -6,7 +6,8 @@ use App\Modules\Shared\Application\Export\ExportColumn;
 use Illuminate\Http\Request;
 
 /**
- * GET /inventory/valuation?export=xlsx|pdf — value of positive stock per store, with a total row.
+ * GET /inventory/valuation?export=xlsx|pdf — value of positive stock per store, with a total row
+ * (ST2d: as of a past date with `as_of`).
  */
 class ValuationExport extends InventoryListExport
 {
@@ -32,6 +33,6 @@ class ValuationExport extends InventoryListExport
 
     public function filters(Request $request): array
     {
-        return $this->summary($request)->all();
+        return $this->summary($request)->value('as_of', 'As of', fn (string $date) => $date)->all();
     }
 }

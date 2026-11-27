@@ -6,12 +6,17 @@ use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Catalog\Infrastructure\Models\TaxRate;
 use App\Modules\Customers\Infrastructure\Models\Customer;
 use App\Modules\Customers\Infrastructure\Models\CustomerGroup;
+use App\Modules\Inventory\Application\Contracts\StockLedger;
+use App\Modules\Inventory\Domain\MovementType;
+use App\Modules\Inventory\Domain\StockChange;
+use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Inventory\Tests\Concerns\InteractsWithStock;
 use App\Modules\Organizations\Infrastructure\Models\Organization;
 use App\Modules\Payments\Tests\Concerns\InteractsWithRegisters;
 use App\Modules\Products\Infrastructure\Models\ProductVariant;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
 use App\Modules\Users\Infrastructure\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 
@@ -63,14 +68,57 @@ trait InteractsWithSales
         });
     }
 
-    protected function stockUp(string $storeId, ProductVariant $variant, string $quantity, string $cost = '10.00', ?string $batch = null, ?string $expiresOn = null): void
+    /**
+     * ST2d: the serial register row of a serial: [status, store_id], or null when unknown.
+     *
+     * @return ?array{0: string, 1: ?string}
+     */
+    protected function serialRow(string $serial): ?array
     {
+        $row = DB::table('serial_numbers')->whereRaw('lower(serial) = ?', [mb_strtolower($serial)])->first(['status', 'store_id']);
+
+        return $row === null ? null : [$row->status, $row->store_id];
+    }
+
+    /**
+     * ST2d: the serial's event types in order, optionally only those of one document type.
+     *
+     * @return list<string>
+     */
+    protected function serialEvents(string $serial, ?string $referenceType = null): array
+    {
+        return DB::table('serial_number_events as e')
+            ->join('serial_numbers as s', 's.id', '=', 'e.serial_number_id')
+            ->whereRaw('lower(s.serial) = ?', [mb_strtolower($serial)])
+            ->when($referenceType !== null, fn ($q) => $q->where('e.reference_type', $referenceType))
+            ->orderBy('e.created_at')->orderBy('e.id')
+            ->pluck('e.type')->all();
+    }
+
+    /**
+     * ST2d: `$serials` registers the units' serial numbers (serial-tracked variants). Serial-tracked
+     * stock without them is posted straight to the ledger: units from before the serial register.
+     *
+     * @param  ?list<string>  $serials
+     */
+    protected function stockUp(string $storeId, ProductVariant $variant, string $quantity, string $cost = '10.00', ?string $batch = null, ?string $expiresOn = null, ?array $serials = null): void
+    {
+        $legacy = $serials === null && app(TenantContext::class)->runAs($variant->organization_id, fn () => (bool) $variant->product()->value('track_serials'));
+        if ($legacy) {
+            app(TenantContext::class)->runAs($variant->organization_id, fn () => DB::transaction(fn () => app(StockLedger::class)->post(
+                [new StockChange($storeId, $variant->id, null, MovementType::Opening, $quantity, $cost)],
+                new StockReference('legacy_opening', (string) Str::uuid()),
+            )));
+
+            return;
+        }
         $this->adjust($storeId, 'opening', array_filter([
             'variant_id' => $variant->id,
             'quantity' => $quantity,
             'unit_cost' => $cost,
             'batch_number' => $batch,
             'expires_on' => $expiresOn,
+            'serials' => $serials,
         ], fn ($v) => $v !== null));
     }
 

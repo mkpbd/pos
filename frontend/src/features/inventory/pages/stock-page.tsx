@@ -14,9 +14,10 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { ImportButton } from '@/features/imports/components/import-button'
-import { useBatchesQuery, useMovementsQuery, useStockQuery, MOVEMENT_LABELS, variantLabel } from '@/features/inventory/api'
+import { useBatchesQuery, useMovementsQuery, useStockQuery, useValuationQuery, MOVEMENT_LABELS, variantLabel } from '@/features/inventory/api'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { INVENTORY_TABS } from '@/features/inventory/sections'
+import { todayIn } from '@/features/cod-remittances/remittances'
 import { compareDecimal, formatMoney, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
@@ -218,6 +219,75 @@ export function MovementsPage() {
           </div>
           <PaginationBar pagination={data.pagination} onPageChange={setPage} />
         </>
+      )}
+    </div>
+  )
+}
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/** "2026-11-30" → "30 Nov 2026". */
+const longDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+
+/**
+ * ST2d: stock value per store (weighted average cost), now or at the end of a past day in the
+ * organization's timezone — e.g. the month-end value after later movements.
+ */
+export function ValuationPage() {
+  const me = useAuth()
+  const today = todayIn(me.organization?.timezone)
+  const [asOf, setAsOf] = useState(today)
+  const valid = DATE.test(asOf) && asOf <= today
+  // Today is the live value (no as_of), exactly as before ST2d.
+  const filters = { as_of: valid && asOf !== today ? asOf : undefined }
+  const { data, error, isPending, refetch } = useValuationQuery(filters)
+  const rows = data?.stores ?? []
+  const currency = me.organization?.base_currency
+  // The day the shown figures are for (the previous figures stay visible while a new day loads).
+  const shown = (data && 'as_of' in data ? data.as_of : filters.as_of) ?? today
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Header exportMenu={<ExportMenu list="valuation" query={filters} disabled={!rows.length} />} />
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="as-of">As of</Label>
+        <Input id="as-of" type="date" className="w-44" max={today} value={asOf} aria-invalid={!valid || undefined} onChange={(e) => setAsOf(e.target.value)} />
+        {!valid && <p className="text-xs text-destructive">Choose a day up to today.</p>}
+      </div>
+
+      {isPending ? (
+        <LoadingState rows={4} label="Loading stock value" />
+      ) : error ? (
+        <ErrorState error={error} onRetry={() => refetch()} />
+      ) : rows.length === 0 ? (
+        <EmptyState title="No stock value" description={`Nothing was in stock on ${longDate(shown)}.`} />
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <Table aria-label="Stock value per store">
+            <caption className="px-3 py-2 text-left text-sm font-medium">Value as of {longDate(shown)}</caption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Store</TableHead>
+                <TableHead className="text-right">Products</TableHead>
+                <TableHead className="text-right">Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row, i) => (
+                <TableRow key={row.store?.id ?? i}>
+                  <TableCell className="text-sm">{row.store?.name ?? '—'}<div className="text-xs text-muted-foreground">{row.store?.branch_name}</div></TableCell>
+                  <TableCell className="text-right font-mono">{row.products}</TableCell>
+                  <TableCell className="text-right font-mono">{formatMoney(row.value, currency)}</TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="font-medium">
+                <TableCell>Total</TableCell>
+                <TableCell />
+                <TableCell className="text-right font-mono" data-testid="valuation-total">{formatMoney(data?.total ?? '0', currency)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   )

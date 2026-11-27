@@ -471,6 +471,12 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Serial register and past-date valuation ST2d (implemented)
+
+- `stock_movements.average_cost_after numeric(18,4)` — the level's weighted average right after the movement (written by the ledger; backfilled by replaying history).
+- `serial_numbers` (organization, variant, `serial`, store or null, status CHECK `in_stock|in_transit|sold|returned_to_supplier|written_off`; unique organization + variant + lower(serial)) and append-only `serial_number_events` (serial, type, store, reference type / id / number, created by / at).
+- `goods_receipt_lines.serials` and `purchase_return_lines.serials` (jsonb, null without serials).
+
 ### Pack barcodes and till price rules ST2c (implemented)
 
 - `product_barcodes.units numeric(18,3)` (default 1, > 0) and `pack_name` — a pack barcode (carton = 24 units); stock and money stay per unit.

@@ -64,6 +64,9 @@ const pages = {
   stock: page(() => import('@/features/inventory/pages/stock-page'), 'StockPage'),
   batches: page(() => import('@/features/inventory/pages/stock-page'), 'BatchesPage'),
   movements: page(() => import('@/features/inventory/pages/stock-page'), 'MovementsPage'),
+  // ST2d: stock value as of a past date, and the serial number register.
+  valuation: page(() => import('@/features/inventory/pages/stock-page'), 'ValuationPage'),
+  serials: page(() => import('@/features/inventory/pages/serials-page'), 'SerialsPage'),
   adjustments: page(() => import('@/features/inventory/pages/adjustment-pages'), 'AdjustmentsPage'),
   newAdjustment: page(() => import('@/features/inventory/pages/adjustment-pages'), 'NewAdjustmentPage'),
   adjustment: page(() => import('@/features/inventory/pages/adjustment-pages'), 'AdjustmentPage'),
@@ -298,6 +301,12 @@ export const routes: RouteObject[] = [
               guarded('inventory.view', 'inventory', pages.stock),
               guarded('inventory.view', 'inventory/batches', pages.batches),
               guarded('inventory.view', 'inventory/movements', pages.movements),
+              guarded('inventory.view', 'inventory/serials', pages.serials),
+              {
+                // The value needs cost access as well as inventory.view (as the API does).
+                element: <RequirePermission permission="inventory.view" />,
+                children: [guarded('products.view_cost', 'inventory/valuation', pages.valuation)],
+              },
               guarded('inventory.view', 'inventory/adjustments', pages.adjustments),
               guarded('inventory.adjust', 'inventory/adjustments/new', pages.newAdjustment),
               guarded('inventory.view', 'inventory/adjustments/:adjustmentId', pages.adjustment),

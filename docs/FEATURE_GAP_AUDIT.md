@@ -82,8 +82,8 @@ batches, weighted-average cost, transfers, adjustments, CSV/Excel/PDF export of 
 | Short-close a partly received PO; purchase return without a goods receipt (expired stock back to the rep) | **Done (ST2a)** | — |
 | Transfer received short / damaged, transfer request & approval, challan print | **Done (ST2b)** | Receive takes no quantities |
 | Print / e-mail PO, goods receipt, transfer documents | **Done (ST2b)** — PO e-mailed; receipt and challan print only | Only the RFQ has a document |
-| Serial-number stock register (phones, electronics) | P1 | Serials only captured at sale (deferred by design) |
-| Stock valuation as of a past date (month-end) | P1 | Only "as of now"; FIFO option P2 |
+| Serial-number stock register (phones, electronics) | **Done (ST2d)** — web orders do not record serials yet | Serials only captured at sale (deferred by design) |
+| Stock valuation as of a past date (month-end) | **Done (ST2d)** | Only "as of now"; FIFO option P2 |
 | Recipes / BOM / kits & combos | P2 (P1 restaurants) | — |
 | Bin / shelf locations, bulk product edits, near-expiry alerts, write-off approval, wastage & dead-stock reports, supplier invoice allocation & advances | P2 | — |
 

@@ -43,7 +43,7 @@ const ALL = 'all'
 const TYPE_HINTS: Record<ImportTypeKey, string> = {
   products: 'Create products and their variants, or update them by SKU. Missing categories, brands and attributes are created.',
   price_update: 'Change selling, cost and wholesale prices by SKU or barcode. Blank cells keep the current price.',
-  opening_stock: 'Put starting stock into your stores. Each store gets one stock adjustment with the reason "Opening stock".',
+  opening_stock: 'Put starting stock into your stores. Each store gets one stock adjustment with the reason "Opening stock". Serial-tracked products need the serials column: one serial number per unit, separated by commas.',
   customers: 'Add customers, or update them when the phone (or e-mail) is already registered.',
   suppliers: 'Add suppliers, or update them when the name and phone match one you have.',
 }

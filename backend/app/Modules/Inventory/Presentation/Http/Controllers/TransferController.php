@@ -169,6 +169,9 @@ class TransferController
             'lines.*.line_id' => ['required', 'uuid', 'distinct'],
             'lines.*.quantity' => ['required', 'regex:'.self::QUANTITY],
             'lines.*.batch_id' => ['nullable', 'uuid'],
+            // ST2d: serials of serial-numbered lines (such lines must be listed).
+            'lines.*.serials' => ['nullable', 'array', 'max:10000'],
+            'lines.*.serials.*' => ['string', 'max:100'],
         ], ['regex' => 'Enter a quantity of zero or more with up to 3 decimals.']);
         /** @var TenantUser $user */
         $user = $request->user();
@@ -279,6 +282,7 @@ class TransferController
         $lines = $transfer->lines()->get();
         $lookups = $this->presenter->lookups($lines->pluck('variant_id')->all(), [$transfer->from_store_id, $transfer->to_store_id], $lines->pluck('batch_id')->all());
         $withCost = $user->can('products.view_cost');
+        $serials = app(TransferStock::class)->dispatchedSerials($transfer);
 
         $transfer->setAttribute('has_discrepancy', $lines->contains(fn (StockTransferLine $l) => $l->received_quantity !== null && Decimal::compare($l->received_quantity, $l->quantity) < 0));
 
@@ -295,6 +299,8 @@ class TransferController
                 'damaged_quantity' => $l->damaged_quantity,
                 'short_quantity' => $l->received_quantity === null ? null : Decimal::sub(Decimal::sub($l->quantity, $l->received_quantity, 3), $l->damaged_quantity, 3),
                 'receive_note' => $l->receive_note,
+                // ST2d: the serials dispatched for this product (serial-numbered lines).
+                'serials' => $serials[$l->variant_id] ?? [],
             ])->values(),
         ];
     }

@@ -23,8 +23,7 @@ import { useCan } from '@/features/auth/use-auth'
 import { REASON_LABELS, useAdjustmentQuery, useAdjustmentsQuery, usePostAdjustmentMutation, variantLabel, type Adjustment, type AdjustmentReason } from '@/features/inventory/api'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { INVENTORY_TABS } from '@/features/inventory/sections'
-import { linesSchema, toApiLine, toCountApiLine } from '@/features/inventory/lines'
-import { handleFormError } from '@/lib/forms'
+import { handleLinesError, linesSchema, toApiLine, toCountApiLine } from '@/features/inventory/lines'
 import { formatMoney, trimDecimal } from '@/lib/money'
 
 export function AdjustmentsPage() {
@@ -87,7 +86,7 @@ export function AdjustmentsPage() {
 }
 
 const REASONS = Object.keys(REASON_LABELS) as AdjustmentReason[]
-const LINE_OPTIONS = { signed: true, cost: 'optional', batch: 'signed' } as const
+const LINE_OPTIONS = { signed: true, cost: 'optional', batch: 'signed', serials: 'signed' } as const
 /** Reason "Stock count" (Q1 §1): lines carry the counted quantity; the server posts the difference. */
 const COUNT_OPTIONS = { count: true, cost: 'optional', batch: 'out' } as const
 
@@ -129,7 +128,7 @@ export function NewAdjustmentPage() {
           toast.success(`Adjustment ${adjustment.number} posted.`)
           navigate(values.reason === 'count' ? `/inventory/adjustments/${adjustment.id}` : '/inventory/adjustments')
         },
-        onError: (error) => handleFormError(error, form.setError, ['store_id', 'reason', 'note', 'lines'], { nested: true }),
+        onError: (error) => handleLinesError(error, form.setError, ['store_id', 'reason', 'note', 'lines'], values.lines),
       },
     ),
   )

@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Loader2Icon } from 'lucide-react'
 import { toast } from 'sonner'
+import { SerialsDialog } from '@/components/common/serials-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useBatchesQuery, useCompleteTransferMutation, variantLabel, type Transfer, type TransferLine } from '@/features/inventory/api'
+import { serialErrors } from '@/features/inventory/lines'
 import { fieldErrorMap } from '@/lib/forms'
 import { compareDecimal, isZeroDecimal, subtractDecimal, trimDecimal } from '@/lib/money'
 
@@ -158,7 +160,7 @@ function BatchChoice({ line, index, storeId, value, onChange }: { line: Transfer
   )
 }
 
-type DispatchRow = { quantity: string; batch: string }
+type DispatchRow = { quantity: string; batch: string; serials: string[] }
 
 /**
  * ST2b: dispatch a requested transfer from the source store — up to the requested quantity per
@@ -168,7 +170,7 @@ export function DispatchRequestDialog({ transfer, onClose }: { transfer: Transfe
   const lines = transfer.lines ?? []
   const complete = useCompleteTransferMutation()
   const requested = (l: TransferLine) => l.requested_quantity ?? l.quantity
-  const [rows, setRows] = useState<DispatchRow[]>(() => lines.map((l) => ({ quantity: trimDecimal(requested(l)), batch: AUTO })))
+  const [rows, setRows] = useState<DispatchRow[]>(() => lines.map((l) => ({ quantity: trimDecimal(requested(l)), batch: AUTO, serials: [] })))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const set = (i: number, patch: Partial<DispatchRow>) => setRows((current) => current.map((r, j) => (j === i ? { ...r, ...patch } : r)))
 
@@ -179,6 +181,8 @@ export function DispatchRequestDialog({ transfer, onClose }: { transfer: Transfe
       const q = (rows[i] as DispatchRow).quantity.trim()
       const error = quantityError(q, line) ?? (compareDecimal(q, requested(line)) > 0 ? `At most the ${trimDecimal(requested(line))} requested.` : null)
       if (error) found[`lines.${i}.quantity`] = error
+      // ST2d: one in-stock serial per unit sent.
+      else if (line.variant?.track_serials && String((rows[i] as DispatchRow).serials.length) !== trimDecimal(q)) found[`lines.${i}.serials`] = `Enter ${trimDecimal(q)} serial numbers.`
     })
     if (Object.keys(found).length === 0 && rows.every((r) => isZeroDecimal(r.quantity.trim()))) found.form = 'Send at least one line, or reject the request.'
     setErrors(found)
@@ -187,7 +191,7 @@ export function DispatchRequestDialog({ transfer, onClose }: { transfer: Transfe
     const body = {
       lines: lines.map((line, i) => {
         const row = rows[i] as DispatchRow
-        return { line_id: line.id, quantity: row.quantity.trim(), ...(row.batch !== AUTO ? { batch_id: row.batch } : {}) }
+        return { line_id: line.id, quantity: row.quantity.trim(), ...(row.batch !== AUTO ? { batch_id: row.batch } : {}), ...(line.variant?.track_serials ? { serials: row.serials } : {}) }
       }),
     }
     complete.mutate({ id: transfer.id, action: 'dispatch', body }, {
@@ -195,7 +199,10 @@ export function DispatchRequestDialog({ transfer, onClose }: { transfer: Transfe
         toast.success(`${t.number} dispatched.`)
         onClose()
       },
-      onError: (error) => setErrors(fieldErrorMap(error)),
+      onError: (error) => {
+        const refused = serialErrors(error, body.lines)
+        setErrors(refused.length > 0 ? Object.fromEntries(refused.map((r) => [r.path, r.message])) : fieldErrorMap(error))
+      },
     })
   }
 
@@ -212,7 +219,7 @@ export function DispatchRequestDialog({ transfer, onClose }: { transfer: Transfe
           <ol className="flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
             {lines.map((line, i) => {
               const row = rows[i] as DispatchRow
-              const err = errors[`lines.${i}.quantity`] ?? errors[`lines.${i}.batch_id`]
+              const err = errors[`lines.${i}.quantity`] ?? errors[`lines.${i}.batch_id`] ?? errors[`lines.${i}.serials`]
               return (
                 <li key={line.id} className="flex flex-col gap-2 rounded-md border p-3">
                   <LineHeading line={line} extra={`Requested ${trimDecimal(requested(line))}`} />
@@ -225,6 +232,19 @@ export function DispatchRequestDialog({ transfer, onClose }: { transfer: Transfe
                       <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                         Batch
                         <BatchChoice line={line} index={i} storeId={transfer.from_store?.id} value={row.batch} onChange={(batch) => set(i, { batch })} />
+                      </div>
+                    )}
+                    {line.variant?.track_serials && (
+                      <div className="flex flex-col items-start gap-1 text-xs text-muted-foreground">
+                        Serials
+                        <SerialsDialog
+                          label={variantLabel(line.variant)}
+                          buttonLabel={`Serials of line ${i + 1}`}
+                          quantity={trimDecimal(row.quantity.trim() || '0')}
+                          serials={row.serials}
+                          onChange={(serials) => set(i, { serials })}
+                          pickFrom={{ storeId: transfer.from_store?.id, variantId: line.variant.id }}
+                        />
                       </div>
                     )}
                   </div>

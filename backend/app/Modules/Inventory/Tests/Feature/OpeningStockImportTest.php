@@ -100,4 +100,34 @@ class OpeningStockImportTest extends TestCase
         $this->actingAsUser($this->createUserWithRole($org, SystemRole::Cashier, [$branch->id]));
         $this->upload('opening_stock', $this->csvFile([self::HEADER, [$juice->sku, 'MAIN', '1', '', '', '']]))->assertForbidden();
     }
+
+    public function test_serial_numbered_rows_list_their_serials(): void
+    {
+        ['admin' => $admin, 'organization' => $org] = $this->provisionTenant();
+        $phoneA = $this->stockedVariant($org, 'Phone A', ['track_serials' => true]);
+        $phoneB = $this->stockedVariant($org, 'Phone B', ['track_serials' => true]);
+        $phoneC = $this->stockedVariant($org, 'Phone C', ['track_serials' => true]);
+        $phoneD = $this->stockedVariant($org, 'Phone D', ['track_serials' => true]);
+        $juice = $this->stockedVariant($org, 'Juice');
+        $main = $this->mainStoreId($org);
+        $this->actingAsUser($admin);
+        $this->adjust($main, 'opening', ['variant_id' => $phoneD->id, 'quantity' => '1', 'unit_cost' => '100', 'serials' => ['D-1']]);
+
+        $header = [...self::HEADER, 'serials'];
+        $import = $this->importNow('opening_stock', $this->csvFile([
+            $header,
+            [$phoneA->sku, 'MAIN', '2', '', '', '', 'A-1, A-2'], // fine
+            [$phoneB->sku, 'MAIN', '2', '', '', '', ''],         // serials needed
+            [$phoneC->sku, 'MAIN', '2', '', '', '', 'C-1'],      // one per unit
+            [$juice->sku, 'MAIN', '1', '', '', '', 'J-1'],       // not serial-numbered
+            [$phoneD->sku, 'MAIN', '1', '', '', '', 'd-1'],      // already in stock (refused at run time)
+        ]));
+        $this->assertSame([1, 1, 3], [$import['created'], $import['failed_rows'], $import['rows_error']]);
+        $columns = collect($import['errors'])->groupBy('row')->map(fn ($errors) => $errors[0]['column'])->all();
+        $this->assertSame([3 => 'serials', 4 => 'serials', 5 => 'serials', 6 => 'serials'], $columns);
+
+        $this->getJson("/api/v1/inventory/stores/{$main}/serials?variant_id={$phoneA->id}")->assertJsonPath('data.*.serial', ['A-1', 'A-2']);
+        $this->assertSame('2.000', $this->stockRow($phoneA->id, $main)['quantity']);
+        $this->assertSame('1.000', $this->stockRow($phoneD->id, $main)['quantity']);
+    }
 }

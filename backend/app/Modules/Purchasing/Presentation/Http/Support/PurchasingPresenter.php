@@ -89,6 +89,7 @@ class PurchasingPresenter
                         'unit_code' => $variant['unit_code'],
                         'allow_decimal' => $variant['allow_decimal'],
                         'track_batches' => $variant['track_batches'],
+                        'track_serials' => $variant['track_serials'],
                     ],
                     'batch' => $batch,
                     'quantity' => $l->quantity,
@@ -111,6 +112,8 @@ class PurchasingPresenter
                     'landed_cost' => $l instanceof GoodsReceiptLine ? $l->landed_cost : false,
                     'landed_unit_cost' => $l instanceof GoodsReceiptLine ? $l->landed_unit_cost : false,
                     'voucher_landed_cost' => $l instanceof GoodsReceiptLine ? ($voucherCosts[$l->id] ?? '0.00') : false,
+                    // ST2d: the serial numbers received / returned (null: not serial-tracked, or posted before the register).
+                    'serials' => $l instanceof PurchaseOrderLine ? false : $l->serials,
                 ], fn ($v) => $v !== false);
             })->values()->all(),
         ];

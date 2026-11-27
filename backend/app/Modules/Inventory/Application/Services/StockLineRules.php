@@ -76,4 +76,57 @@ class StockLineRules
 
         return $variants;
     }
+
+    /**
+     * ST2d: serial numbers on document lines. Lines of serial-tracked variants need one serial per
+     * unit (count = |quantity|), each serial once per variant in the document; other lines none.
+     *
+     * @param  array<int, array{variant_id: string, quantity: string, serials?: mixed}>  $lines
+     * @param  array<string, array<string, mixed>>  $variants  variant info keyed by id (from validate())
+     * @return array<int, list<string>> trimmed serials of the serial-tracked lines, by line index
+     *
+     * @throws ValidationException
+     */
+    public function serials(array $lines, array $variants, string $prefix = 'lines'): array
+    {
+        $errors = [];
+        $result = [];
+        $seen = [];
+        foreach ($lines as $i => $line) {
+            $variant = $variants[$line['variant_id']] ?? null;
+            $given = array_values(array_filter(array_map(fn ($s) => trim((string) $s), (array) ($line['serials'] ?? [])), fn (string $s) => $s !== ''));
+            $path = "{$prefix}.{$i}.serials";
+            if ($variant === null || ! $variant['track_serials']) {
+                if ($given !== []) {
+                    $errors[$path] = [($variant['product_name'] ?? 'This product').' does not track serial numbers.'];
+                }
+
+                continue;
+            }
+
+            $quantity = Decimal::round(ltrim((string) $line['quantity'], '-'), 3);
+            if (! Decimal::isWhole($quantity) || count($given) !== (int) Decimal::round($quantity, 0)) {
+                $errors[$path] = ["Enter one serial number per unit of {$variant['product_name']} (".Decimal::round($quantity, 0).' needed, '.count($given).' given).'];
+
+                continue;
+            }
+            foreach ($given as $serial) {
+                $key = $line['variant_id'].'|'.mb_strtolower($serial);
+                if (isset($seen[$key])) {
+                    $errors[$path] = ["Serial {$serial} is entered twice."];
+                }
+                if (mb_strlen($serial) > 100) {
+                    $errors[$path] = ['A serial number has at most 100 characters.'];
+                }
+                $seen[$key] = true;
+            }
+            $result[$i] = $given;
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $result;
+    }
 }

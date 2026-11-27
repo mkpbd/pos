@@ -2,11 +2,13 @@
 
 namespace App\Modules\Inventory\Application\Actions;
 
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Services\StockLineRules;
 use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Inventory\Domain\AdjustmentReason;
 use App\Modules\Inventory\Domain\MovementType;
+use App\Modules\Inventory\Domain\SerialStatus;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Inventory\Infrastructure\Models\StockAdjustment;
@@ -44,12 +46,13 @@ class PostStockAdjustment
         private readonly SequenceGenerator $sequences,
         private readonly AuditTrail $audit,
         private readonly ProductDirectory $products,
+        private readonly SerialRegister $serialRegister,
     ) {}
 
     /**
-     * @param  array{store_id: string, reason: string, note?: ?string, lines: list<array{variant_id: string, quantity?: ?string, counted_quantity?: ?string, unit_cost?: ?string, batch_id?: ?string, batch_number?: ?string, expires_on?: ?string}>}  $data
+     * @param  array{store_id: string, reason: string, note?: ?string, lines: list<array{variant_id: string, quantity?: ?string, counted_quantity?: ?string, unit_cost?: ?string, batch_id?: ?string, batch_number?: ?string, expires_on?: ?string, serials?: ?list<string>}>}  $data
      *
-     * @throws BusinessRuleViolation NOTHING_TO_ADJUST, INSUFFICIENT_STOCK, STORE_INACTIVE, BATCH_EXPIRY_MISMATCH
+     * @throws BusinessRuleViolation NOTHING_TO_ADJUST, INSUFFICIENT_STOCK, STORE_INACTIVE, BATCH_EXPIRY_MISMATCH, SERIAL_IN_STOCK, SERIAL_NOT_IN_STOCK
      */
     public function __invoke(TenantUser $actor, array $data): StockAdjustment
     {
@@ -97,8 +100,11 @@ class PostStockAdjustment
         $variants = $this->lineRules->validate($organizationId, $increases, 'in')
             + $this->lineRules->validate($organizationId, $decreases, 'out')
             + $this->lineRules->validate($organizationId, $countChecks, 'in');
+        // ST2d: serial-numbered lines name their serials — except a stock count, which (like a
+        // stocktake) moves quantities only: counting by serial is not supported.
+        $serials = $reason === AdjustmentReason::Count ? [] : $this->lineRules->serials($signed, $variants);
 
-        return DB::transaction(function () use ($actor, $organizationId, $store, $reason, $data, $lines, $counted, $variants) {
+        return DB::transaction(function () use ($actor, $organizationId, $store, $reason, $data, $lines, $counted, $variants, $serials) {
             $batchIds = [];
             foreach ($lines as $i => $line) {
                 $batchIds[$i] = $line['batch_id'] ?? (filled($line['batch_number'] ?? null)
@@ -130,7 +136,7 @@ class PostStockAdjustment
             if ($entries === []) {
                 throw new BusinessRuleViolation('NOTHING_TO_ADJUST', 'Every counted quantity matches the stock, so there is nothing to adjust.');
             }
-            $entries = array_values($entries);
+            $entries = array_values(array_map(fn (array $e, int $i) => $e + ['serials' => $serials[$i] ?? []], $entries, array_keys($entries)));
 
             $adjustment = StockAdjustment::query()->create([
                 'organization_id' => $organizationId,
@@ -155,7 +161,18 @@ class PostStockAdjustment
                 );
             }
 
-            $posted = $this->ledger->post($changes, new StockReference('stock_adjustment', $adjustment->id, $adjustment->number));
+            $reference = new StockReference('stock_adjustment', $adjustment->id, $adjustment->number);
+            // ST2d: serials come in (adjusted_in) or are written off before the stock moves (legacy rule).
+            foreach ($entries as $entry) {
+                if ($entry['serials'] === []) {
+                    continue;
+                }
+                Decimal::isNegative($entry['quantity'])
+                    ? $this->serialRegister->issue($store['id'], $entry['line']['variant_id'], $entry['serials'], SerialStatus::WrittenOff, $reference)
+                    : $this->serialRegister->receive($store['id'], $entry['line']['variant_id'], $entry['serials'], $reference, 'adjusted_in');
+            }
+
+            $posted = $this->ledger->post($changes, $reference);
 
             foreach ($entries as $i => $entry) {
                 $adjustment->lines()->create([

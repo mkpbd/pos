@@ -9,6 +9,8 @@ export type VariantOption = {
   allow_decimal: boolean
   track_stock: boolean
   track_batches: boolean
+  /** ST2d: one serial number per unit on stock and purchase documents. */
+  track_serials?: boolean
   /** Only present for users who may see costs. */
   purchase_price?: string
   tax_rate: string | null
@@ -28,6 +30,7 @@ export function toVariantOptions(products: Product[]): VariantOption[] {
         allow_decimal: p.unit?.allow_decimal ?? false,
         track_stock: p.type === 'standard' && p.track_stock,
         track_batches: p.track_batches,
+        track_serials: p.track_serials,
         purchase_price: v.purchase_price,
         tax_rate: p.tax_rate?.rate ?? null,
         ...(v.packs?.length ? { packs: v.packs } : {}),

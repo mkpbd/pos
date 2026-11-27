@@ -2,6 +2,7 @@
 
 namespace App\Modules\Sales\Application\Actions;
 
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Domain\StockChange;
@@ -47,6 +48,7 @@ class CancelSale
         private readonly AuditTrail $audit,
         private readonly PromotionRedemptions $redemptions,
         private readonly StoredValueTenders $storedValue,
+        private readonly SerialRegister $serialRegister,
     ) {}
 
     public function __invoke(TenantUser $actor, Sale $sale, string $reason): Sale
@@ -104,10 +106,16 @@ class CancelSale
 
             $this->redemptions->releaseSale($locked->id);
 
-            SaleLineSerial::query()
+            $serials = SaleLineSerial::query()
                 ->whereIn('sale_line_id', $lines->map(fn (SaleLine $l) => $l->id)->all())
                 ->whereNull('released_at')
-                ->update(['released_at' => $now]);
+                ->orderBy('id')
+                ->get(['id', 'variant_id', 'serial']);
+            // ST2d: the serials are back in stock at the store.
+            foreach ($serials->groupBy('variant_id') as $variantId => $rows) {
+                $this->serialRegister->returnFromCustomer($locked->store_id, (string) $variantId, $rows->pluck('serial')->all(), new StockReference('sale_cancellation', $locked->id, $locked->number));
+            }
+            SaleLineSerial::query()->whereKey($serials->pluck('id')->all())->update(['released_at' => $now]);
 
             $locked->update([
                 'status' => SaleStatus::Cancelled,

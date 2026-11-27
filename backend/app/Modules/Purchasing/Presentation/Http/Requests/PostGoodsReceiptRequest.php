@@ -39,6 +39,9 @@ class PostGoodsReceiptRequest extends FormRequest
             'lines.*.batch_number' => ['nullable', 'string', 'max:64'],
             'lines.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
             'lines.*.manufactured_on' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.app(OrganizationDate::class)->today()],
+            // ST2d: one serial number per unit (quantity + bonus) of a serial-tracked variant.
+            'lines.*.serials' => ['sometimes', 'nullable', 'array', 'max:10000'],
+            'lines.*.serials.*' => ['string', 'max:100'],
             // SC3: landed cost charges, allocated over the lines.
             ...self::chargeRules('charges'),
             // Who bills the charge; empty = included in the main supplier's invoice.

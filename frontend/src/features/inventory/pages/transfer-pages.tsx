@@ -41,8 +41,7 @@ import { formatDateTime } from '@/features/web-orders/orders'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { INVENTORY_TABS } from '@/features/inventory/sections'
-import { linesSchema, toApiLine } from '@/features/inventory/lines'
-import { handleFormError } from '@/lib/forms'
+import { handleLinesError, linesSchema, toApiLine } from '@/features/inventory/lines'
 
 const STATUS: Record<TransferStatus, { label: string; variant: 'info' | 'success' | 'destructive' | 'warning' | 'secondary' }> = {
   requested: { label: 'Requested', variant: 'warning' },
@@ -156,7 +155,7 @@ export function TransfersPage() {
   )
 }
 
-const DISPATCH_LINES = { batch: 'out' } as const
+const DISPATCH_LINES = { batch: 'out', serials: 'out' } as const
 const REQUEST_LINES = {} as const
 const schemaFor = (options: typeof DISPATCH_LINES | typeof REQUEST_LINES) =>
   z
@@ -182,7 +181,7 @@ function TransferForm({ request = false }: { request?: boolean }) {
 
   const onSubmit = form.handleSubmit((values) => {
     const input = { from_store_id: values.from_store_id, to_store_id: values.to_store_id, note: values.note.trim() || null }
-    const onError = (error: Error) => handleFormError(error, form.setError, ['from_store_id', 'to_store_id', 'note', 'lines'], { nested: true })
+    const onError = (error: Error) => handleLinesError(error, form.setError, ['from_store_id', 'to_store_id', 'note', 'lines'], values.lines)
     if (request) {
       ask.mutate({ ...input, lines: values.lines.map((l) => ({ variant_id: l.variant?.id ?? '', quantity: l.quantity.trim() })) }, {
         onSuccess: (t) => {

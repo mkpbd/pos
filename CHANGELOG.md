@@ -21,6 +21,21 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### ST2d — Serial-number register, stock value as of a past date
+
+Last part of ST2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). No new packages.
+
+#### Added
+- **Serial numbers** (Inventory → Serial numbers): phones and electronics are tracked one by one — entered on goods receipts, stock adjustments, transfers and purchase returns (with a picker of the serials in stock), checked at the till (a phone already sold or at another store cannot be sold), back in stock on returns and cancellations; each serial shows its history with links to the documents. Stock from before the register still sells.
+- **Stock valuation** page (Inventory → Valuation) with an **As of** date: the value at a past month-end, also in the export.
+
+#### Tests
+- Backend 2070 (2069 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3300; mocked Playwright 646 (new `st2d-serials`).
+- Full-stack (PostgreSQL, desktop) 69 — new **ST2d** on Bazar Fresh: two phones received with their serials, one sold, selling it again refused (`SERIAL_NOT_IN_STOCK`), its history (receipt, sale) on the Serial numbers page; valuation as of 30 days ago, today (= live) and a future date (refused).
+
+#### Upgrade
+- `php artisan migrate` (the valuation backfill replays the stock history once).
+
 ### ST2c — Carton barcodes, wholesale price, quantity breaks, branch prices
 
 Third part of ST2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). Serial register and past-date valuation (ST2d) follow. No new packages.

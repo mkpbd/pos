@@ -20,9 +20,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $line_subtotal
  * @property string $line_tax
  * @property string $line_total
+ * @property ?list<string> $serials ST2d: serial numbers returned (serial-tracked variants)
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'purchase_return_id', 'goods_receipt_line_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total'])]
+#[Fillable(['organization_id', 'purchase_return_id', 'goods_receipt_line_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'serials'])]
 class PurchaseReturnLine extends Model
 {
     use BelongsToOrganization, HasUuids;
@@ -36,6 +37,7 @@ class PurchaseReturnLine extends Model
             'line_subtotal' => 'decimal:2',
             'line_tax' => 'decimal:2',
             'line_total' => 'decimal:2',
+            'serials' => 'array',
         ];
     }
 }

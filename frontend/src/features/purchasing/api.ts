@@ -12,7 +12,9 @@ export type SupplierRef = { id: string; code: string; name: string }
 
 export type PurchaseLine = {
   id: string
-  variant: { id: string; product_name: string; variant_name: string | null; sku: string; unit_code: string | null; allow_decimal: boolean; track_batches: boolean } | null
+  variant: { id: string; product_name: string; variant_name: string | null; sku: string; unit_code: string | null; allow_decimal: boolean; track_batches: boolean; track_serials?: boolean } | null
+  /** ST2d receipt lines: the serial numbers received. */
+  serials?: string[]
   batch?: BatchRef | null
   quantity: string
   received_quantity?: string
@@ -148,7 +150,7 @@ export type SupplierRefund = {
 export type StatementEntry = { date: string; type: 'goods_receipt' | 'receipt_charge' | 'landed_cost_voucher' | 'purchase_return' | 'payment' | 'refund' | 'payment_void' | 'refund_void'; id: string; number: string; reference: string | null; amount: string; balance: string }
 export type SupplierStatement = { supplier: SupplierRef; opening_balance: string; entries: StatementEntry[]; closing_balance: string }
 
-type LineInput = { variant_id: string; quantity: string; unit_cost?: string | null; tax_rate?: string | null; discount_percent?: string; bonus_quantity?: string; batch_number?: string; expires_on?: string | null; purchase_order_line_id?: string }
+type LineInput = { variant_id: string; quantity: string; unit_cost?: string | null; tax_rate?: string | null; discount_percent?: string; bonus_quantity?: string; batch_number?: string; expires_on?: string | null; purchase_order_line_id?: string; serials?: string[] }
 
 export type PurchaseOrderInput = { supplier_id: string; store_id: string; order_date: string; expected_date: string | null; notes: string | null; lines: LineInput[] }
 export type GoodsReceiptInput = {
@@ -262,7 +264,7 @@ export function usePostReceiptMutation() {
 export function usePostReturnMutation(receiptId: string) {
   const invalidate = useInvalidate()
   return useMutation({
-    mutationFn: (input: { reason: string; notes: string | null; lines: { goods_receipt_line_id: string; quantity: string }[] }) =>
+    mutationFn: (input: { reason: string; notes: string | null; lines: { goods_receipt_line_id: string; quantity: string; serials?: string[] }[] }) =>
       api.post<PurchaseReturn>(`/purchasing/receipts/${receiptId}/returns`, input).then((r) => r.data),
     onSuccess: invalidate,
   })
@@ -274,7 +276,7 @@ export type DirectReturnInput = {
   store_id: string
   reason: string
   notes: string | null
-  lines: { variant_id: string; quantity: string; batch_id?: string | null; unit_cost?: string }[]
+  lines: { variant_id: string; quantity: string; batch_id?: string | null; unit_cost?: string; serials?: string[] }[]
 }
 
 /** Idempotent: pass the same key when retrying the same return. */

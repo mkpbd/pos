@@ -172,7 +172,7 @@ class SaleReturnTest extends TestCase
         $this->assertSame('5.000', $this->stockRow($tv->id, $store)['quantity']);
     }
 
-    public function test_written_off_lines_bring_no_stock_back_and_serials_are_released(): void
+    public function test_written_off_lines_bring_no_stock_back_and_their_serials_are_written_off(): void
     {
         ['admin' => $admin, 'organization' => $org] = $this->provisionTenant();
         $phone = $this->sellable($org, 'Phone', '20000.00', ['serials' => true]);
@@ -192,9 +192,11 @@ class SaleReturnTest extends TestCase
             ->assertJsonPath('data.lines.0.serials', ['IMEI-2']);
 
         $this->assertSame('1.000', $this->stockRow($phone->id, $store)['quantity'], 'a written-off phone does not come back');
-        // IMEI-2 can be sold again; IMEI-1 is still out.
-        $this->checkout($this->cart($store, [[$phone, '1', ['serials' => ['IMEI-1']]]], [['card', '20000']]))->assertStatus(422);
-        $this->checkout($this->cart($store, [[$phone, '1', ['serials' => ['IMEI-2']]]], [['card', '20000']]))->assertCreated();
+        // ST2d: IMEI-1 is still out and IMEI-2 is written off; the phone left in stock sells.
+        $this->checkout($this->cart($store, [[$phone, '1', ['serials' => ['IMEI-1']]]], [['card', '20000']]))->assertStatus(422)->assertJsonPath('error.code', 'SERIAL_NOT_IN_STOCK');
+        $this->checkout($this->cart($store, [[$phone, '1', ['serials' => ['IMEI-2']]]], [['card', '20000']]))->assertStatus(422)->assertJsonPath('error.code', 'SERIAL_NOT_IN_STOCK');
+        $this->assertSame(['returned', 'written_off'], $this->serialEvents('IMEI-2', 'sale_return'));
+        $this->checkout($this->cart($store, [[$phone, '1', ['serials' => ['IMEI-3']]]], [['card', '20000']]))->assertCreated();
         $this->getJson("/api/v1/sales/{$sale['id']}")->assertJsonPath('data.lines.0.returned_serials', ['IMEI-2']);
     }
 

@@ -122,7 +122,7 @@ export type AdjustmentInput = {
   reason: AdjustmentReason
   note: string | null
   /** Each line sends either a signed `quantity` or, for reason `count`, the `counted_quantity`. */
-  lines: { variant_id: string; quantity?: string; counted_quantity?: string; unit_cost?: string | null; batch_id?: string | null; batch_number?: string | null; expires_on?: string | null }[]
+  lines: { variant_id: string; quantity?: string; counted_quantity?: string; unit_cost?: string | null; batch_id?: string | null; batch_number?: string | null; expires_on?: string | null; serials?: string[] }[]
 }
 
 export type TransferRequestInput = {
@@ -135,14 +135,14 @@ export type TransferRequestInput = {
 /** ST2b: body of a transfer action — receive (per-line received / damaged), dispatch of a request (quantities, batch), reject (reason). */
 export type TransferActionBody =
   | { lines: { line_id: string; received_quantity: string; damaged_quantity: string; note: string | null }[] }
-  | { lines: { line_id: string; quantity: string; batch_id?: string }[] }
+  | { lines: { line_id: string; quantity: string; batch_id?: string; serials?: string[] }[] }
   | { reason: string }
 
 export type TransferInput = {
   from_store_id: string
   to_store_id: string
   note: string | null
-  lines: { variant_id: string; quantity: string; batch_id?: string | null }[]
+  lines: { variant_id: string; quantity: string; batch_id?: string | null; serials?: string[] }[]
 }
 
 export const inventoryKeys = {
@@ -213,6 +213,104 @@ export function useStockOnHandQuery(variantId: string | undefined, storeId: stri
     return { quantity: batches.data ? (batches.data.find((b) => b.batch.id === batchId)?.quantity ?? '0') : null, isPending: batches.isPending }
   }
   return { quantity: stock.data ?? null, isPending: stock.isPending }
+}
+
+/** ST2d: serial number register. */
+export type SerialStatus = 'in_stock' | 'in_transit' | 'sold' | 'returned_to_supplier' | 'written_off'
+export type SerialEventType = 'received' | 'transferred_out' | 'transferred_in' | 'sold' | 'returned' | 'returned_to_supplier' | 'adjusted_in' | 'written_off'
+
+export type SerialRow = {
+  id: string
+  serial: string
+  variant: VariantRef | null
+  store: { id: string; name: string } | null
+  status: SerialStatus
+  updated_at: string | null
+}
+
+export type SerialEvent = {
+  id?: string
+  type: SerialEventType
+  store: { id: string; name: string } | null
+  reference_type: string | null
+  reference_id: string | null
+  reference_number: string | null
+  created_by?: UserRef
+  created_at: string
+}
+
+export type SerialDetail = SerialRow & { events: SerialEvent[] }
+
+export const SERIAL_STATUS: Record<SerialStatus, { label: string; variant: 'success' | 'info' | 'secondary' | 'warning' | 'destructive' }> = {
+  in_stock: { label: 'In stock', variant: 'success' },
+  in_transit: { label: 'In transit', variant: 'info' },
+  sold: { label: 'Sold', variant: 'secondary' },
+  returned_to_supplier: { label: 'Returned to supplier', variant: 'warning' },
+  written_off: { label: 'Written off', variant: 'destructive' },
+}
+
+export const SERIAL_EVENTS: Record<SerialEventType, string> = {
+  received: 'Received',
+  transferred_out: 'Transferred out',
+  transferred_in: 'Transferred in',
+  sold: 'Sold',
+  returned: 'Returned by customer',
+  returned_to_supplier: 'Returned to supplier',
+  adjusted_in: 'Added by adjustment',
+  written_off: 'Written off',
+}
+
+/** The admin page of the document behind a serial event, when it has one. */
+export function serialReferencePath(type: string | null, id: string | null): string | null {
+  if (!type || !id) return null
+  const pages: Record<string, string> = {
+    goods_receipt: `/purchasing/receipts/${id}`,
+    purchase_return: '/purchasing/returns',
+    stock_adjustment: `/inventory/adjustments/${id}`,
+    stock_transfer: `/inventory/transfers/${id}`,
+    sale: `/sales/${id}`,
+    sale_cancellation: `/sales/${id}`,
+    sale_return: `/returns/${id}`,
+    online_order: `/web-orders/${id}`,
+    online_return: `/web-returns/${id}`,
+  }
+  return pages[type] ?? null
+}
+
+export const useSerialsQuery = (params: Query) => usePagedList<SerialRow>('/inventory/serials', params)
+
+export function useSerialQuery(id: string | null) {
+  return useQuery({
+    queryKey: [...inventoryKeys.all, 'serial', id],
+    queryFn: ({ signal }) => api.get<SerialDetail>(`/inventory/serials/${id}`, { signal }).then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+/** In-stock serials of a product at a store, for pickers (rows or plain strings). */
+export function useStoreSerialsQuery(storeId: string | null | undefined, variantId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: [...inventoryKeys.all, 'store-serials', storeId, variantId],
+    queryFn: ({ signal }) =>
+      api.get<(string | { serial: string })[]>(`/inventory/stores/${storeId}/serials`, { signal, query: { variant_id: variantId } })
+        .then((r) => r.data.map((s) => (typeof s === 'string' ? s : s.serial))),
+    enabled: enabled && !!storeId && !!variantId,
+  })
+}
+
+/** ST2d: stock value per store, now or at the end of a past day (`as_of`, organization timezone). */
+export type Valuation = {
+  stores: { store: StoreRef | null; products: number; value: string }[]
+  total: string
+  as_of?: string | null
+}
+
+export function useValuationQuery(params: Query) {
+  return useQuery({
+    queryKey: [...inventoryKeys.all, 'valuation', params],
+    queryFn: ({ signal }) => api.get<Valuation>('/inventory/valuation', { signal, query: params }).then((r) => r.data),
+    placeholderData: (previous) => previous,
+  })
 }
 
 export function useBatchesQuery(params: Query, enabled = true) {

@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { emptyLine, packQuantity, packUnitCost, type LinesForm } from '@/components/common/line-values'
+import { SerialsDialog } from '@/components/common/serials-dialog'
 import { VariantPicker } from '@/components/common/variant-picker'
 import { useBatchesQuery, useStockOnHandQuery } from '@/features/inventory/api'
+import { serialsMode, serialsNeeded } from '@/features/inventory/lines'
 import { isZeroDecimal, subtractDecimal, trimDecimal } from '@/lib/money'
 
 /** The "Pack" select's single-units choice. */
@@ -32,6 +34,8 @@ type Config = {
   discount?: boolean
   /** Placeholder of an empty cost (what the server uses instead); turns off the last-purchase-cost pre-fill. */
   costPlaceholder?: string
+  /** ST2d serial-tracked products: 'in' types / scans new serials, 'out' also offers the store's in-stock serials, 'signed' decides by the quantity's sign. */
+  serials?: 'in' | 'out' | 'signed'
 }
 
 type Props<T extends LinesForm> = {
@@ -174,6 +178,7 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                             onChange={(option) => {
                               f.onChange(option)
                               set(`lines.${i}.pack`, '')
+                              set(`lines.${i}.serials`, [])
                               // Pre-fill the last known cost; the user can overwrite it.
                               if (config.cost && !config.costPlaceholder && !line?.unit_cost && option.purchase_price) set(`lines.${i}.unit_cost`, option.purchase_price)
                             }}
@@ -196,6 +201,25 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                       {variant?.unit_code}{line?.max_quantity && ` · max ${line.max_quantity}`}
                     </p>
                     {err('quantity') && <p className="text-xs text-destructive">{err('quantity')}</p>}
+                    {config.serials && line && variant?.track_serials && (
+                      <div className="mt-1">
+                        <Controller
+                          control={c}
+                          name={`lines.${i}.serials`}
+                          render={({ field: f }) => (
+                            <SerialsDialog
+                              label={variant.label}
+                              buttonLabel={`Serials of line ${i + 1}`}
+                              quantity={String(serialsNeeded(line, config) ?? '')}
+                              serials={f.value ?? []}
+                              onChange={f.onChange}
+                              pickFrom={serialsMode(config, line.quantity) === 'out' ? { storeId: config.storeId, variantId: variant.id } : undefined}
+                            />
+                          )}
+                        />
+                        {err('serials') && <p className="text-xs text-destructive">{err('serials')}</p>}
+                      </div>
+                    )}
                     {packs.length > 0 && (
                       <div className="mt-1 flex flex-col gap-1">
                         <Select

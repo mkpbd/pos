@@ -14,6 +14,7 @@ use App\Modules\Inventory\Application\Actions\PostStockAdjustment;
 use App\Modules\Inventory\Domain\AdjustmentReason;
 use App\Modules\Inventory\Infrastructure\Models\Batch;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
+use App\Modules\Shared\Domain\Exceptions\BusinessRuleViolation;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Illuminate\Validation\ValidationException;
 
@@ -25,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  * average cost exactly like a goods receipt ((q·avg + in·cost) / (q + in); the product's purchase
  * price when the cost is blank), so stock valuation and later COGS include the opening stock.
  * A line the adjustment refuses is reported on its row and the store's adjustment is posted with
- * the other lines.
+ * the other lines. ST2d: serial-numbered products list their serials (comma-separated) or are refused.
  */
 final class OpeningStockImport extends BaseImportHandler implements GroupedImportHandler
 {
@@ -59,6 +60,8 @@ final class OpeningStockImport extends BaseImportHandler implements GroupedImpor
             new ImportColumn('unit_cost', 'Unit cost', false, '18.50', 'Cost per unit for stock valuation. Blank: the product\'s cost price.', ColumnType::Decimal),
             new ImportColumn('batch_number', 'Batch number', false, '', 'Required for batch-tracked products; leave blank otherwise.', maxLength: 100),
             new ImportColumn('expires_on', 'Expiry date', false, '', 'Batch expiry date (YYYY-MM-DD or an Excel date).', ColumnType::Date),
+            // ST2d: serial-numbered products list one serial per unit.
+            new ImportColumn('serials', 'Serial numbers', false, '', 'Required for serial-numbered products: one serial per unit, separated by commas. Leave blank otherwise.', maxLength: 20000),
         ];
     }
 
@@ -138,6 +141,19 @@ final class OpeningStockImport extends BaseImportHandler implements GroupedImpor
             $errors->add('batch_number', "{$name} does not track batches: leave the batch and expiry blank.");
         }
 
+        $serials = self::serials($row['serials'] ?? null);
+        if ($variant['track_serials']) {
+            if ($serials === []) {
+                $errors->add('serials', "{$name} is serial-numbered: list one serial number per unit, separated by commas.");
+            } elseif (Decimal::isWhole($quantity) && count($serials) !== (int) Decimal::round($quantity, 0)) {
+                $errors->add('serials', 'Enter one serial number per unit ('.Decimal::round($quantity, 0).' needed, '.count($serials).' given).');
+            } elseif (count(array_unique(array_map(mb_strtolower(...), $serials))) !== count($serials)) {
+                $errors->add('serials', 'A serial number is listed twice.');
+            }
+        } elseif ($serials !== []) {
+            $errors->add('serials', "{$name} does not track serial numbers: leave the serials blank.");
+        }
+
         return $errors->any() ? $errors->result() : RowResult::create();
     }
 
@@ -172,6 +188,7 @@ final class OpeningStockImport extends BaseImportHandler implements GroupedImpor
                     'unit_cost' => $row['unit_cost'],
                     'batch_number' => $row['batch_number'],
                     'expires_on' => $row['expires_on'],
+                    'serials' => self::serials($row['serials'] ?? null) ?: null,
                 ], fn ($v) => $v !== null);
             }
 
@@ -186,6 +203,17 @@ final class OpeningStockImport extends BaseImportHandler implements GroupedImpor
                     $results[$number] = RowResult::create();
                 }
                 break;
+            } catch (BusinessRuleViolation $e) {
+                // ST2d: a serial already in stock is refused on the rows that list it.
+                $taken = array_map(mb_strtolower(...), $e->details['serials'] ?? []);
+                $refused = array_filter($pending, fn (array $row) => array_intersect(array_map(mb_strtolower(...), self::serials($row['serials'] ?? null)), $taken) !== []);
+                if (! str_starts_with($e->errorCode, 'SERIAL_') || $refused === []) {
+                    throw $e;
+                }
+                foreach (array_keys($refused) as $number) {
+                    $results[$number] = RowResult::errors([['column' => 'serials', 'message' => $e->getMessage()]]);
+                    unset($pending[$number]);
+                }
             } catch (ValidationException $e) {
                 $refused = [];
                 foreach ($e->errors() as $field => $messages) {
@@ -209,6 +237,14 @@ final class OpeningStockImport extends BaseImportHandler implements GroupedImpor
         ksort($results);
 
         return $results;
+    }
+
+    /**
+     * @return list<string> the comma-separated serials of a cell, trimmed
+     */
+    private static function serials(?string $cell): array
+    {
+        return array_values(array_filter(array_map(trim(...), explode(',', (string) $cell)), fn (string $s) => $s !== ''));
     }
 
     /**

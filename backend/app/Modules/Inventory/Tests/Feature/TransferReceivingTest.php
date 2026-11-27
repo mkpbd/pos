@@ -131,8 +131,8 @@ class TransferReceivingTest extends TestCase
     {
         ['org' => $org, 'from' => $from, 'to' => $to] = $this->setUpTwoBranches();
         $phone = $this->stockedVariant($org, 'Phone', ['track_serials' => true]);
-        $this->adjust($from, 'opening', ['variant_id' => $phone->id, 'quantity' => '3', 'unit_cost' => '100']);
-        $transfer = $this->send($from, $to, [['variant_id' => $phone->id, 'quantity' => '3']]);
+        $this->adjust($from, 'opening', ['variant_id' => $phone->id, 'quantity' => '3', 'unit_cost' => '100', 'serials' => ['P1', 'P2', 'P3']]);
+        $transfer = $this->send($from, $to, [['variant_id' => $phone->id, 'quantity' => '3', 'serials' => ['P1', 'P2', 'P3']]]);
         $url = "/api/v1/inventory/transfers/{$transfer['id']}/receive";
         $lineId = $transfer['lines'][0]['id'];
 
@@ -140,6 +140,7 @@ class TransferReceivingTest extends TestCase
             ->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['lines.0.received_quantity']]]);
         $this->postJson($url, ['lines' => [['line_id' => $lineId, 'received_quantity' => '3']]])->assertOk()
             ->assertJsonPath('data.has_discrepancy', false);
+        $this->getJson("/api/v1/inventory/stores/{$to}/serials?variant_id={$phone->id}")->assertOk()->assertJsonPath('data.*.serial', ['P1', 'P2', 'P3']);
     }
 
     public function test_only_the_receiving_branch_of_the_same_organization_can_receive(): void

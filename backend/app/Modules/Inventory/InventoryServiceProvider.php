@@ -5,12 +5,14 @@ namespace App\Modules\Inventory;
 use App\Modules\Imports\Application\Contracts\ImportHandler;
 use App\Modules\Inventory\Application\Contracts\BatchDirectory;
 use App\Modules\Inventory\Application\Contracts\ReplenishmentData;
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Contracts\StockLevels;
 use App\Modules\Inventory\Application\Contracts\StockValuation;
 use App\Modules\Inventory\Application\Events\StockFellBelowReorderLevel;
 use App\Modules\Inventory\Application\Imports\OpeningStockImport;
 use App\Modules\Inventory\Infrastructure\Directory\EloquentBatchDirectory;
+use App\Modules\Inventory\Infrastructure\Ledger\EloquentSerialRegister;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLedger;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockLevels;
 use App\Modules\Inventory\Infrastructure\Ledger\EloquentStockValuation;
@@ -40,6 +42,8 @@ class InventoryServiceProvider extends ModuleServiceProvider
         $this->app->bind(StockLevels::class, EloquentStockLevels::class);
         $this->app->bind(StockValuation::class, EloquentStockValuation::class);
         $this->app->bind(ReplenishmentData::class, EloquentReplenishmentData::class);
+        // ST2d: the serial-number register (Purchasing and Sales call it too).
+        $this->app->bind(SerialRegister::class, EloquentSerialRegister::class);
         // P1a: stock in the product variant grid (the contract is declared by Products).
         $this->app->bind(VariantStock::class, InventoryVariantStock::class);
         // ST1: opening stock import (Imports module).

@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\Application\Actions;
 
 use App\Modules\Branches\Application\Contracts\BranchDirectory;
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Services\StockLineRules;
 use App\Modules\Inventory\Application\Services\StoreAccess;
@@ -10,6 +11,7 @@ use App\Modules\Inventory\Domain\MovementType;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Inventory\Domain\TransferStatus;
+use App\Modules\Inventory\Infrastructure\Models\SerialNumberEvent;
 use App\Modules\Inventory\Infrastructure\Models\StockTransfer;
 use App\Modules\Inventory\Infrastructure\Models\StockTransferLine;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
@@ -31,6 +33,9 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *  cancel   → it goes back into the source.
  * ST2b: a branch can also request stock (`requested`, nothing moves); the source dispatches
  * it (→ in transit) or rejects it, and the requesting branch can cancel it.
+ * ST2d: serial-numbered lines name their serials at dispatch (in_transit in the register); they
+ * arrive at the destination on receipt (such lines are received in full) or go back to the
+ * source when the transfer is cancelled.
  * The transfer row is locked while it changes state, so it cannot be received twice.
  */
 class TransferStock
@@ -44,10 +49,11 @@ class TransferStock
         private readonly SequenceGenerator $sequences,
         private readonly AuditTrail $audit,
         private readonly ProductDirectory $products,
+        private readonly SerialRegister $serialRegister,
     ) {}
 
     /**
-     * @param  array{from_store_id: string, to_store_id: string, note?: ?string, lines: list<array{variant_id: string, quantity: string, batch_id?: ?string}>}  $data
+     * @param  array{from_store_id: string, to_store_id: string, note?: ?string, lines: list<array{variant_id: string, quantity: string, batch_id?: ?string, serials?: ?list<string>}>}  $data
      * @param  bool  $allocateBatches  lines without a batch of batch-tracked products are taken
      *                                 first-expiry-first-out by the ledger, one transfer line per batch
      *                                 (replenishment transfers, SC1)
@@ -64,9 +70,11 @@ class TransferStock
         if ($to['id'] === $from['id']) {
             throw ValidationException::withMessages(['to_store_id' => ['Choose a different store than the source.']]);
         }
-        $this->lineRules->validate($organizationId, $data['lines'], 'out', checkBatches: ! $allocateBatches);
+        $variants = $this->lineRules->validate($organizationId, $data['lines'], 'out', checkBatches: ! $allocateBatches);
+        // ST2d: system replenishment transfers (allocated batches) move quantities only.
+        $serials = $allocateBatches ? [] : $this->lineRules->serials($data['lines'], $variants);
 
-        return DB::transaction(function () use ($actor, $organizationId, $from, $to, $data, $allocateBatches) {
+        return DB::transaction(function () use ($actor, $organizationId, $from, $to, $data, $allocateBatches, $serials) {
             $transfer = StockTransfer::query()->create([
                 'organization_id' => $organizationId,
                 'number' => $this->sequences->next($organizationId, 'stock_transfer', 'TRF-'),
@@ -80,7 +88,7 @@ class TransferStock
                 'dispatched_at' => now(),
             ]);
 
-            $this->ship($transfer, array_values($data['lines']), $allocateBatches);
+            $this->ship($transfer, array_values($data['lines']), $allocateBatches, $serials);
 
             $this->audit->record('stock_transfer.dispatched', $transfer, new: ['number' => $transfer->number, 'from_store_id' => $from['id'], 'to_store_id' => $to['id']]);
 
@@ -140,7 +148,7 @@ class TransferStock
      * ST2b: the source branch dispatches a request. Lines not listed go in full; quantity 0 drops
      * a line. Lines without a batch are allocated first-expiry-first-out.
      *
-     * @param  list<array{line_id: string, quantity: string, batch_id?: ?string}>  $lines
+     * @param  list<array{line_id: string, quantity: string, batch_id?: ?string, serials?: ?list<string>}>  $lines
      */
     public function dispatchRequest(TenantUser $actor, StockTransfer $transfer, array $lines = []): StockTransfer
     {
@@ -182,20 +190,22 @@ class TransferStock
                     'quantity' => $quantity,
                     'batch_id' => $i === null ? null : ($lines[$i]['batch_id'] ?? null),
                     'requested_quantity' => $line->requested_quantity,
+                    'serials' => $i === null ? null : ($lines[$i]['serials'] ?? null),
                 ];
             }
             if ($ship === []) {
                 throw ValidationException::withMessages(['lines' => ['Dispatch at least one line.']]);
             }
             $organizationId = $locked->organization_id;
-            $this->lineRules->validate($organizationId, $ship, 'out', checkBatches: false);
+            $variants = $this->lineRules->validate($organizationId, $ship, 'out', checkBatches: false);
+            $serials = $this->lineRules->serials($ship, $variants);
             $chosen = array_filter($ship, fn (array $l) => $l['batch_id'] !== null);
             if ($chosen !== []) {
                 $this->lineRules->validate($organizationId, $chosen, 'out');
             }
 
             $locked->lines()->delete();
-            $this->ship($locked, array_values($ship), allocateBatches: true);
+            $this->ship($locked, array_values($ship), true, array_values(array_map(fn (int $i) => $serials[$i] ?? [], array_keys($ship))));
             $locked->forceFill([
                 'status' => TransferStatus::InTransit,
                 'dispatched_by' => $actor->getAuthIdentifier(),
@@ -249,7 +259,7 @@ class TransferStock
                 } elseif ($variant !== null && ! $variant['allow_decimal'] && (! Decimal::isWhole($received) || ! Decimal::isWhole($damaged))) {
                     $errors["{$path}.received_quantity"] = ["{$variant['product_name']} is counted in whole units ({$variant['unit_code']})."];
                 } elseif ($variant !== null && $variant['track_serials'] && Decimal::compare($received, $line->quantity) !== 0) {
-                    // shortcut: serial numbers are not tracked per transfer, so these lines are received in full.
+                    // ST2b/ST2d: serial-numbered lines are received in full (every dispatched serial arrives).
                     $errors["{$path}.received_quantity"] = ["{$variant['product_name']} is serial-numbered and must be received in full."];
                 }
                 $plan[] = [$line, $received, $damaged, $i === null ? null : ($lines[$i]['note'] ?? null)];
@@ -276,8 +286,12 @@ class TransferStock
                     ];
                 }
             }
+            $reference = new StockReference('stock_transfer', $locked->id, $locked->number);
+            foreach ($this->dispatchedSerials($locked) as $variantId => $serials) {
+                $this->serialRegister->arrive($locked->to_store_id, $variantId, $serials, $reference);
+            }
             if ($changes !== []) {
-                $this->ledger->post($changes, new StockReference('stock_transfer', $locked->id, $locked->number));
+                $this->ledger->post($changes, $reference);
             }
 
             $locked->forceFill([
@@ -312,7 +326,11 @@ class TransferStock
             $changes = $locked->lines()->get()->map(fn (StockTransferLine $l) => new StockChange(
                 $locked->from_store_id, $l->variant_id, $l->batch_id, MovementType::TransferIn, $l->quantity, $l->unit_cost,
             ))->all();
-            $this->ledger->post($changes, new StockReference('stock_transfer', $locked->id, $locked->number));
+            $reference = new StockReference('stock_transfer', $locked->id, $locked->number);
+            foreach ($this->dispatchedSerials($locked) as $variantId => $serials) {
+                $this->serialRegister->arrive($locked->from_store_id, $variantId, $serials, $reference);
+            }
+            $this->ledger->post($changes, $reference);
 
             $locked->forceFill([
                 'status' => TransferStatus::Cancelled,
@@ -351,17 +369,25 @@ class TransferStock
     }
 
     /**
-     * Takes the lines out of the source store and writes the transfer lines.
+     * Takes the lines out of the source store and writes the transfer lines. ST2d: serials of
+     * serial-numbered lines go in transit first (before the stock leaves: the legacy rule).
      *
      * @param  list<array{variant_id: string, quantity: string, batch_id?: ?string, requested_quantity?: ?string}>  $lines
+     * @param  array<int, list<string>>  $serials  by line index
      */
-    private function ship(StockTransfer $transfer, array $lines, bool $allocateBatches): void
+    private function ship(StockTransfer $transfer, array $lines, bool $allocateBatches, array $serials = []): void
     {
+        $reference = new StockReference('stock_transfer', $transfer->id, $transfer->number);
+        foreach ($serials as $i => $given) {
+            if ($given !== []) {
+                $this->serialRegister->dispatch($transfer->from_store_id, $lines[$i]['variant_id'], $given, $reference);
+            }
+        }
         $changes = array_map(fn (array $l) => new StockChange(
             $transfer->from_store_id, $l['variant_id'], $l['batch_id'] ?? null, MovementType::TransferOut, $l['quantity'],
             allocateBatches: $allocateBatches && ($l['batch_id'] ?? null) === null,
         ), $lines);
-        $posted = $this->ledger->post($changes, new StockReference('stock_transfer', $transfer->id, $transfer->number));
+        $posted = $this->ledger->post($changes, $reference);
 
         foreach ($lines as $i => $line) {
             $requested = $line['requested_quantity'] ?? null;
@@ -392,6 +418,28 @@ class TransferStock
                 'requested_quantity' => $requested,
             ]);
         }
+    }
+
+    /**
+     * ST2d: the serials this transfer dispatched, by variant.
+     *
+     * @return array<string, list<string>>
+     */
+    public function dispatchedSerials(StockTransfer $transfer): array
+    {
+        $result = [];
+        $rows = SerialNumberEvent::query()
+            ->join('serial_numbers as s', 's.id', '=', 'serial_number_events.serial_number_id')
+            ->where('serial_number_events.reference_type', 'stock_transfer')
+            ->where('serial_number_events.reference_id', $transfer->id)
+            ->where('serial_number_events.type', 'transferred_out')
+            ->orderByRaw('lower(s.serial)')
+            ->get(['s.variant_id', 's.serial']);
+        foreach ($rows as $row) {
+            $result[$row->variant_id][] = $row->serial;
+        }
+
+        return $result;
     }
 
     private function lockInTransit(StockTransfer $transfer): StockTransfer

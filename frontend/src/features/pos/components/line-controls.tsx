@@ -1,8 +1,6 @@
 import { useState } from 'react'
-import { PercentIcon, ScanBarcodeIcon, XIcon } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { PercentIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { DiscountInput } from '@/features/pos/api'
@@ -84,59 +82,5 @@ export function DiscountButton({ discount, ...props }: { discount: DiscountInput
     <Button type="button" variant="ghost" size="icon-sm" className={cn(discount && 'text-primary')} {...props}>
       <PercentIcon />
     </Button>
-  )
-}
-
-/** Scan one serial number per unit of a serial-tracked product. */
-export function SerialsDialog({ label, quantity, serials, onChange }: { label: string; quantity: string; serials: string[]; onChange: (serials: string[]) => void }) {
-  const [open, setOpen] = useState(false)
-  const [list, setList] = useState<string[]>(serials)
-  const [entry, setEntry] = useState('')
-  const needed = /^\d+$/.test(quantity) ? Number(quantity) : null
-
-  const add = () => {
-    const serial = entry.trim()
-    if (serial && !list.some((s) => s.toLowerCase() === serial.toLowerCase())) setList((l) => [...l, serial])
-    setEntry('')
-  }
-
-  return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2"
-        aria-label={`Serial numbers of ${label}`}
-        onClick={() => { setList(serials); setOpen(true) }}
-      >
-        <ScanBarcodeIcon />
-        <Badge variant={needed !== null && serials.length === needed ? 'success' : 'destructive'}>{serials.length}/{needed ?? '?'}</Badge>
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Serial numbers</DialogTitle>
-            <DialogDescription>{label}: scan one serial number per unit ({needed ?? 'whole units only'}).</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); add() }} className="flex gap-2">
-            <Input aria-label="Serial number" autoFocus value={entry} onChange={(e) => setEntry(e.target.value)} placeholder="Scan or type, then Enter" />
-            <Button type="submit" variant="outline">Add</Button>
-          </form>
-          <ul className="flex max-h-60 flex-col gap-1 overflow-y-auto">
-            {list.map((s) => (
-              <li key={s} className="flex items-center justify-between rounded border px-2 py-1 font-mono text-sm">
-                {s}
-                <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove serial ${s}`} onClick={() => setList((l) => l.filter((x) => x !== s))}><XIcon /></Button>
-              </li>
-            ))}
-          </ul>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={() => { onChange(list); setOpen(false) }}>Save {list.length} serial{list.length === 1 ? '' : 's'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   )
 }

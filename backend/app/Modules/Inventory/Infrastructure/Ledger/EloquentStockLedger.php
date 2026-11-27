@@ -142,6 +142,7 @@ class EloquentStockLedger implements StockLedger
             'quantity' => $signed,
             'unit_cost' => $cost,
             'balance_after' => $newQuantity,
+            'average_cost_after' => $newAverage,
             'reference_type' => $reference->type,
             'reference_id' => $reference->id,
             'reference_number' => $reference->number,

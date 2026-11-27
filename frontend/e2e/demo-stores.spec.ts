@@ -3174,3 +3174,79 @@ test('ST2c: Bazar Fresh prices a product by branch, wholesale customer and quant
     await context.close()
   }
 })
+
+test('ST2d: Bazar Fresh receives two phones by serial, sells one, cannot sell it twice, sees its history; stock is valued as of a past date', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The admin flow runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  // Dates in the shop's timezone (Bazar Fresh: Asia/Dhaka), as the server reads them.
+  const day = (offset: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date(Date.now() + offset * 86_400_000))
+  try {
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    const current = await call('GET', '/api/v1/register-sessions/current')
+    if (!(current.status === 200 && current.body.data)) {
+      const register = await call('POST', '/api/v1/cash-registers', { branch_id: branch.id, code: `R${stamp.slice(-6)}`, name: `Serials ${stamp}` })
+      expect(register.status).toBe(201)
+      expect((await call('POST', `/api/v1/cash-registers/${register.body.data.id}/sessions`, { opening_float: '1000' })).status).toBeLessThan(300)
+    }
+    const units = (await call('GET', '/api/v1/units')).body.data as { id: string; code: string }[]
+    const product = await call('POST', '/api/v1/products', {
+      name: `Walton Primo ${stamp}`, type: 'standard', unit_id: (units.find((u) => u.code === 'pcs') ?? units[0]!).id, track_stock: true, track_serials: true,
+      variants: [{ sku: `WP-${stamp}`, purchase_price: '10000', selling_price: '12000' }],
+    })
+    expect(product.status).toBe(201)
+    const variantId = product.body.data.variants[0].id as string
+    const supplier = await call('POST', '/api/v1/suppliers', { name: `Walton Distributor ${stamp}` })
+    const imeiA = `35${stamp}01`
+    const imeiB = `35${stamp}02`
+
+    // Two phones come in with their serials.
+    const receipt = await call('POST', '/api/v1/purchasing/receipts', {
+      supplier_id: supplier.body.data.id, store_id: store.id, invoice_date: day(0),
+      lines: [{ variant_id: variantId, quantity: '2', unit_cost: '10000', tax_rate: '0', serials: [imeiA, imeiB] }],
+    })
+    expect(receipt.status).toBe(201)
+    const inStock = (await call('GET', `/api/v1/inventory/stores/${store.id}/serials?variant_id=${variantId}`)).body.data as { serial: string }[]
+    expect(inStock.map((s) => s.serial).sort()).toEqual([imeiA, imeiB])
+
+    // One is sold; selling the same phone again is refused.
+    const sale = { store_id: store.id, lines: [{ variant_id: variantId, quantity: '1', serials: [imeiA] }], payments: [{ method: 'cash', amount: '12000' }] }
+    const sold = await call('POST', '/api/v1/pos/checkout', sale)
+    expect(sold.status).toBe(201)
+    const again = await call('POST', '/api/v1/pos/checkout', sale)
+    expect(again.status).toBe(422)
+    expect(again.body.error.code).toBe('SERIAL_NOT_IN_STOCK')
+
+    // The serial's history on the Serial numbers page: received, then sold on the invoice.
+    await page.goto(`${base}/admin/inventory/serials`)
+    await page.getByLabel('Search serial numbers').fill(imeiA)
+    await page.getByRole('button', { name: imeiA }).click()
+    await expect(page.getByText(receipt.body.data.number).first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(sold.body.data.number).first()).toBeVisible()
+
+    // Valuation as of a past date answers; today's equals the live one; a future date is refused.
+    expect((await call('GET', `/api/v1/inventory/valuation?as_of=${day(-30)}`)).status).toBe(200)
+    const live = (await call('GET', '/api/v1/inventory/valuation')).body.data
+    const today = (await call('GET', `/api/v1/inventory/valuation?as_of=${day(0)}`)).body.data
+    expect(Number(today.total)).toBeCloseTo(Number(live.total), 2)
+    expect((await call('GET', `/api/v1/inventory/valuation?as_of=${day(2)}`)).status).toBe(422)
+  } finally {
+    await context.close()
+  }
+})

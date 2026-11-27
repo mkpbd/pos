@@ -91,6 +91,7 @@ class EloquentStockValuation implements StockValuation
                 'unit_cost' => Decimal::sub($after, $before, 4),
                 'value' => $value,
                 'balance_after' => $level->quantity,
+                'average_cost_after' => $after,
                 'reference_type' => $reference->type,
                 'reference_id' => $reference->id,
                 'reference_number' => $reference->number,

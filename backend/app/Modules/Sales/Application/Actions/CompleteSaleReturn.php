@@ -2,8 +2,10 @@
 
 namespace App\Modules\Sales\Application\Actions;
 
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Domain\MovementType;
+use App\Modules\Inventory\Domain\SerialStatus;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Payments\Application\Contracts\PaymentLedger;
@@ -39,7 +41,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * Critical workflow #10 (second half): approves and posts a pending return in one transaction.
  *
  *  - Restocked lines go back to the exact batches they were sold from, at the cost they left
- *    with (written-off lines bring no stock back); serial numbers become sellable again.
+ *    with (written-off lines bring no stock back). ST2d: restocked serials are in stock again
+ *    in the serial register; written-off ones are recorded as returned, then written off.
  *  - The total is first credited against what the customer still owes on the invoice; the
  *    rest is refunded with the methods given (they must add up to it). Card, mobile and
  *    points refunds are limited to what was paid that way; cash leaves the approver's drawer.
@@ -57,6 +60,8 @@ class CompleteSaleReturn
         // POS1b: refunds to store credit / as a credit note (its code is shown once).
         private readonly StoredValueTenders $storedValue,
         private readonly IssuedCreditNotes $creditNotes,
+        // ST2d: returned serials go back into the serial register.
+        private readonly SerialRegister $serials,
     ) {}
 
     /**
@@ -93,12 +98,18 @@ class CompleteSaleReturn
 
             $this->restock($sale, $locked, $lines);
             $now = now();
+            $reference = new StockReference('sale_return', $locked->id, $locked->number);
             foreach ($lines->filter(fn (SaleReturnLine $l) => ! empty($l->serials)) as $line) {
                 SaleLineSerial::query()
                     ->where('sale_line_id', $line->sale_line_id)
                     ->whereNull('released_at')
                     ->whereIn(DB::raw('lower(serial)'), array_map(mb_strtolower(...), $line->serials))
                     ->update(['released_at' => $now]);
+                // ST2d: back in stock at the store; a written-off line's serials are then written off.
+                $this->serials->returnFromCustomer($sale->store_id, $line->variant_id, $line->serials, $reference);
+                if (! $line->restock) {
+                    $this->serials->issue($sale->store_id, $line->variant_id, $line->serials, SerialStatus::WrittenOff, $reference);
+                }
             }
 
             $this->payments->record($actor, $locked->branch_id, array_values(array_map(

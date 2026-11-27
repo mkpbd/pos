@@ -9,6 +9,7 @@ use App\Modules\Inventory\Presentation\Http\Exports\StockLevelsExport;
 use App\Modules\Inventory\Presentation\Http\Exports\StockMovementsExport;
 use App\Modules\Inventory\Presentation\Http\Exports\ValuationExport;
 use App\Modules\Inventory\Presentation\Http\Support\InventoryPresenter;
+use App\Modules\Organizations\Application\Support\OrganizationDate;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
 use App\Modules\Shared\Application\Contracts\TenantUser;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
@@ -17,6 +18,7 @@ use App\Modules\Shared\Infrastructure\Http\Exports\ListExporter;
 use App\Modules\Shared\Infrastructure\Http\Exports\RowSource;
 use App\Modules\Shared\Infrastructure\Http\Queries\ListQuery;
 use App\Modules\Shared\Infrastructure\Http\Responses\ApiResponse;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
@@ -177,20 +179,43 @@ class StockController
     /**
      * Inventory valuation
      *
-     * Quantity and value (weighted average cost) of positive stock per store.
+     * Quantity and value (weighted average cost) of positive stock per store. ST2d: `as_of`
+     * (YYYY-MM-DD, not in the future) values each level at the last movement up to the end of
+     * that day in the organization's timezone: balance_after × average_cost_after.
      */
-    public function valuation(Request $request, ListExporter $exports): Response
+    public function valuation(Request $request, ListExporter $exports, OrganizationDate $dates): Response
     {
-        $request->validate(['branch_id' => ['sometimes', 'uuid']]);
+        $request->validate([
+            'branch_id' => ['sometimes', 'uuid'],
+            'as_of' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'before_or_equal:'.$dates->today()],
+        ]);
         /** @var TenantUser $user */
         $user = $request->user();
+        $organizationId = $this->tenant->requireOrganization();
+        $asOf = $request->query('as_of') ?: null;
 
-        $query = DB::table('stock_levels')
-            ->where('organization_id', $this->tenant->requireOrganization())
-            ->where('quantity', '>', 0)
-            ->groupBy('store_id')
-            ->select(['store_id', DB::raw('COUNT(DISTINCT variant_id) as products'), DB::raw('SUM(quantity * average_cost) as value')]);
-        $this->presenter->scopeBranches($query, $user, $request->query('branch_id'));
+        if ($asOf === null) {
+            $query = DB::table('stock_levels')
+                ->where('organization_id', $organizationId)
+                ->where('quantity', '>', 0)
+                ->groupBy('store_id')
+                ->select(['store_id', DB::raw('COUNT(DISTINCT variant_id) as products'), DB::raw('SUM(quantity * average_cost) as value')]);
+            $this->presenter->scopeBranches($query, $user, $request->query('branch_id'));
+        } else {
+            // The instant is bound in UTC: a bound Carbon loses its offset.
+            $end = CarbonImmutable::parse($asOf, $dates->timezone())->addDay()->startOfDay()->utc()->format('Y-m-d H:i:s.uP');
+            $last = DB::table('stock_movements')
+                ->where('organization_id', $organizationId)
+                ->where('created_at', '<', $end)
+                ->selectRaw('DISTINCT ON (store_id, variant_id, batch_id) store_id, variant_id, balance_after, average_cost_after')
+                ->orderBy('store_id')->orderBy('variant_id')->orderBy('batch_id')
+                ->orderByDesc('created_at')->orderByDesc('id');
+            $this->presenter->scopeBranches($last, $user, $request->query('branch_id'));
+            $query = DB::query()->fromSub($last, 'l')
+                ->where('balance_after', '>', 0)
+                ->groupBy('store_id')
+                ->select(['store_id', DB::raw('COUNT(DISTINCT variant_id) as products'), DB::raw('SUM(balance_after * COALESCE(average_cost_after, 0)) as value')]);
+        }
 
         $rows = $query->get();
         $stores = $this->presenter->lookups(storeIds: $rows->pluck('store_id')->all())['stores'];
@@ -208,6 +233,7 @@ class StockController
         }
 
         return ApiResponse::success([
+            'as_of' => $asOf,
             'stores' => $valuation,
             'total' => $total,
         ]);

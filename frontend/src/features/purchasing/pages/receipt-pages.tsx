@@ -11,6 +11,7 @@ import { LinesEditor } from '@/components/common/lines-editor'
 import { ExportMenu } from '@/components/common/export-menu'
 import { PageHeader } from '@/components/common/page-header'
 import { PdfButton } from '@/components/common/pdf-button'
+import { SerialsDialog } from '@/components/common/serials-dialog'
 import { PaginationBar } from '@/components/common/pagination-bar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { StoreSelect } from '@/components/common/store-select'
@@ -24,7 +25,7 @@ import { useAuth, useCan } from '@/features/auth/use-auth'
 import { SectionTabs } from '@/features/inventory/components/inventory-tabs'
 import { PURCHASING_TABS } from '@/features/inventory/sections'
 import { variantLabel } from '@/features/inventory/api'
-import { linesSchema, toApiLine } from '@/features/inventory/lines'
+import { handleLinesError, linesSchema, serialErrors, toApiLine } from '@/features/inventory/lines'
 import { DocumentLinesTable, EFFECTIVE_COST_LABEL, LinesTotalsPreview } from '@/features/purchasing/components/document-totals'
 import { SupplierSelect } from '@/features/purchasing/components/supplier-select'
 import {
@@ -110,7 +111,7 @@ export function ReceiptsPage() {
   )
 }
 
-const LINE_OPTIONS = { cost: 'required', tax: true, batch: 'in', discount: true } as const
+const LINE_OPTIONS = { cost: 'required', tax: true, batch: 'in', discount: true, serials: 'in' } as const
 const schema = z.object({
   supplier_id: z.string().min(1, 'Choose a supplier.'),
   store_id: z.string().min(1, 'Choose the receiving store.'),
@@ -137,6 +138,7 @@ function linesFromOrder(order: PurchaseOrder): LineValue[] {
         allow_decimal: line.variant.allow_decimal,
         track_stock: true,
         track_batches: line.variant.track_batches,
+        track_serials: line.variant.track_serials ?? false,
         tax_rate: line.tax_rate,
       },
       quantity: trimDecimal(open),
@@ -191,7 +193,7 @@ export function NewReceiptPage() {
           toast.success(`${r.number} posted — stock updated.`)
           navigate(`/purchasing/receipts/${r.id}`, { replace: true })
         },
-        onError: (error) => handleFormError(error, form.setError, ['supplier_id', 'store_id', 'supplier_invoice_number', 'invoice_date', 'due_date', 'notes', 'lines', 'charges'], { nested: true }),
+        onError: (error) => handleLinesError(error, form.setError, ['supplier_id', 'store_id', 'supplier_invoice_number', 'invoice_date', 'due_date', 'notes', 'lines', 'charges'], values.lines),
       },
     ),
   )
@@ -251,10 +253,15 @@ const returnSchema = z.object({
   quantities: z.record(z.string(), z.string().regex(/^(\d{1,15}(\.\d{1,3})?)?$/, 'A quantity with up to 3 decimals.')),
 })
 
+const tracksSerials = (line: PurchaseLine) => !!line.variant?.track_serials || (line.serials?.length ?? 0) > 0
+
 function ReturnDialog({ receipt, open, onOpenChange }: { receipt: GoodsReceipt; open: boolean; onOpenChange: (open: boolean) => void }) {
   const post = usePostReturnMutation(receipt.id)
   const form = useForm<z.infer<typeof returnSchema>>({ resolver: zodResolver(returnSchema), defaultValues: { reason: '', quantities: {} } })
   const { errors } = form.formState
+  const quantities = useWatch({ control: form.control, name: 'quantities' })
+  // ST2d: serial-tracked lines name the serials that go back (one of those received on this receipt).
+  const [serials, setSerials] = useState<Record<string, string[]>>({})
   // ST2a: free units came into stock too, so they can go back.
   const returnable = (receipt.lines ?? [])
     .map((l) => ({ line: l, max: subtractDecimal(addDecimal(l.quantity, l.bonus_quantity ?? '0'), l.returned_quantity ?? '0') }))
@@ -263,19 +270,30 @@ function ReturnDialog({ receipt, open, onOpenChange }: { receipt: GoodsReceipt; 
   const onSubmit = form.handleSubmit((values) => {
     const lines = Object.entries(values.quantities)
       .filter(([, q]) => q.trim() !== '' && compareDecimal(q.trim(), '0') > 0)
-      .map(([goods_receipt_line_id, quantity]) => ({ goods_receipt_line_id, quantity: quantity.trim() }))
+      .map(([goods_receipt_line_id, quantity]) => {
+        const line = returnable.find((r) => r.line.id === goods_receipt_line_id)?.line
+        return { goods_receipt_line_id, quantity: quantity.trim(), ...(line && tracksSerials(line) ? { serials: serials[line.id] ?? [] } : {}) }
+      })
     const tooMuch = lines.find((l) => compareDecimal(l.quantity, returnable.find((r) => r.line.id === l.goods_receipt_line_id)?.max ?? '0') > 0)
-    if (lines.length === 0 || tooMuch) {
-      form.setError('root', { message: lines.length === 0 ? 'Enter at least one quantity to return.' : 'A quantity exceeds what can still be returned.' })
+    const wrongSerials = lines.find((l) => l.serials && String(l.serials.length) !== trimDecimal(l.quantity))
+    if (lines.length === 0 || tooMuch || wrongSerials) {
+      form.setError('root', {
+        message: lines.length === 0 ? 'Enter at least one quantity to return.' : tooMuch ? 'A quantity exceeds what can still be returned.' : 'Enter one serial number per unit returned.',
+      })
       return
     }
     post.mutate({ reason: values.reason, notes: null, lines }, {
       onSuccess: (r) => {
         toast.success(`${r.number} posted — stock reduced.`)
         form.reset()
+        setSerials({})
         onOpenChange(false)
       },
-      onError: (error) => handleFormError(error, form.setError, ['reason']),
+      onError: (error) => {
+        const refused = serialErrors(error, lines)
+        if (refused.length > 0) form.setError('root', { message: refused.map((r) => r.message).join(' · ') })
+        else handleFormError(error, form.setError, ['reason'])
+      },
     })
   })
 
@@ -295,6 +313,19 @@ function ReturnDialog({ receipt, open, onOpenChange }: { receipt: GoodsReceipt; 
                 <div className="text-xs text-muted-foreground">Returnable: {trimDecimal(max)} {line.variant?.unit_code}</div>
               </div>
               <Input aria-label={`Return quantity of ${variantLabel(line.variant)}`} inputMode="decimal" placeholder="0" {...form.register(`quantities.${line.id}`)} />
+              {tracksSerials(line) && (
+                <div className="col-span-2 justify-self-end">
+                  <SerialsDialog
+                    label={variantLabel(line.variant)}
+                    buttonLabel={`Returned serials of ${variantLabel(line.variant)}`}
+                    quantity={trimDecimal(quantities?.[line.id]?.trim() || '0')}
+                    serials={serials[line.id] ?? []}
+                    onChange={(list) => setSerials((current) => ({ ...current, [line.id]: list }))}
+                    available={line.serials}
+                    pickFrom={line.variant ? { storeId: receipt.store?.id, variantId: line.variant.id } : undefined}
+                  />
+                </div>
+              )}
             </div>
           ))}
           <FormField label="Reason" error={errors.reason?.message}><Input placeholder="e.g. damaged, wrong item" {...form.register('reason')} /></FormField>
@@ -353,6 +384,7 @@ export function ReceiptPage() {
         discounts={discounted}
         extra={[
           { header: 'Returned', cell: (l) => trimDecimal(l.returned_quantity ?? '0') },
+          ...((data.lines ?? []).some((l) => l.serials?.length) ? [{ header: 'Serials', cell: (l: PurchaseLine) => l.serials?.join(', ') || '—' }] : []),
           ...(discounted
             ? [{ header: EFFECTIVE_COST_LABEL, cell: (l: PurchaseLine) => (l.effective_unit_cost ? formatMoney(l.effective_unit_cost, undefined, 4) : '—') }]
             : []),
@@ -432,7 +464,7 @@ export function ReturnsPage() {
   )
 }
 
-const DIRECT_LINE_OPTIONS = { cost: 'optional', batch: 'out' } as const
+const DIRECT_LINE_OPTIONS = { cost: 'optional', batch: 'out', serials: 'out' } as const
 const directSchema = z.object({
   supplier_id: z.string().min(1, 'Choose a supplier.'),
   store_id: z.string().min(1, 'Choose the store the goods leave.'),
@@ -475,7 +507,7 @@ export function NewReturnPage() {
       },
       onError: (error) => {
         key.settle(error)
-        handleFormError(error, form.setError, ['supplier_id', 'store_id', 'reason', 'notes', 'lines'], { nested: true })
+        handleLinesError(error, form.setError, ['supplier_id', 'store_id', 'reason', 'notes', 'lines'], values.lines)
       },
     })
   })

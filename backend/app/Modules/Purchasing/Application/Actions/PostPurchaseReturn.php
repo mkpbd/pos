@@ -2,10 +2,12 @@
 
 namespace App\Modules\Purchasing\Application\Actions;
 
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Services\StockLineRules;
 use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Inventory\Domain\MovementType;
+use App\Modules\Inventory\Domain\SerialStatus;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Products\Application\Contracts\ProductDirectory;
@@ -31,6 +33,10 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * ST2a: `direct()` returns goods without a receipt (e.g. bought before the system was used):
  * stock leaves at the current average cost and the supplier's credit is the given unit cost,
  * else that average cost; tax at the product's rate.
+ *
+ * ST2d: lines of serial-tracked variants name one serial per unit returned; they leave the
+ * serial register as returned_to_supplier (SerialRegister::issue, so they must be in stock at
+ * the store). A receipt-based return may only name serials that came on that receipt line.
  */
 class PostPurchaseReturn
 {
@@ -42,6 +48,7 @@ class PostPurchaseReturn
         private readonly StockLedger $ledger,
         private readonly SequenceGenerator $sequences,
         private readonly AuditTrail $audit,
+        private readonly SerialRegister $serialRegister,
     ) {}
 
     /**
@@ -86,6 +93,7 @@ class PostPurchaseReturn
             if ($errors !== []) {
                 throw ValidationException::withMessages($errors);
             }
+            $serials = $this->receiptSerials($requested, $receiptLines->all(), $variants);
 
             $priced = array_map(fn (array $l) => [
                 'quantity' => $l['quantity'],
@@ -122,6 +130,7 @@ class PostPurchaseReturn
                     'unit_cost' => $receiptLine->effective_unit_cost,
                     'tax_rate' => $receiptLine->tax_rate,
                     ...$totals['lines'][$i],
+                    'serials' => $serials[$i] ?? null,
                 ]);
                 $changes[] = new StockChange($receipt->store_id, $receiptLine->variant_id, $receiptLine->batch_id, MovementType::PurchaseReturn, $line['quantity'], $receiptLine->effective_unit_cost);
             }
@@ -132,7 +141,9 @@ class PostPurchaseReturn
                 $receiptLine->save();
             }
 
-            $this->ledger->post($changes, new StockReference('purchase_return', $return->id, $return->number));
+            $reference = new StockReference('purchase_return', $return->id, $return->number);
+            $this->issueSerials($receipt->store_id, array_map(fn (array $l) => $receiptLines[$l['goods_receipt_line_id']]->variant_id, $requested), $serials, $reference);
+            $this->ledger->post($changes, $reference);
 
             $this->audit->record('purchase_return.posted', $return, new: [
                 'number' => $return->number,
@@ -158,9 +169,10 @@ class PostPurchaseReturn
         $store = $this->storeAccess->require($actor, $data['store_id']);
         $lines = array_values($data['lines']);
         $variants = $this->lineRules->validate($organizationId, $lines, 'out');
+        $serials = $this->lineRules->serials($lines, $variants);
         $currency = $this->context->currency();
 
-        return DB::transaction(function () use ($actor, $organizationId, $store, $data, $lines, $variants, $currency) {
+        return DB::transaction(function () use ($actor, $organizationId, $store, $data, $lines, $variants, $serials, $currency) {
             $return = new PurchaseReturn([
                 'organization_id' => $organizationId,
                 'number' => $this->sequences->next($organizationId, 'purchase_return', 'PRN-'),
@@ -175,10 +187,12 @@ class PostPurchaseReturn
             ]);
             $return->setAttribute($return->getKeyName(), $return->newUniqueId());
 
+            $reference = new StockReference('purchase_return', $return->id, $return->number);
+            $this->issueSerials($store['id'], array_column($lines, 'variant_id'), $serials, $reference);
             $moved = $this->ledger->post(array_map(
                 fn (array $l) => new StockChange($store['id'], $l['variant_id'], $l['batch_id'] ?? null, MovementType::PurchaseReturn, $l['quantity']),
                 $lines,
-            ), new StockReference('purchase_return', $return->id, $return->number));
+            ), $reference);
 
             $priced = [];
             foreach ($lines as $i => $line) {
@@ -194,7 +208,7 @@ class PostPurchaseReturn
 
             $return->fill(['subtotal' => $totals['subtotal'], 'tax_total' => $totals['tax_total'], 'total' => $totals['total']])->save();
             foreach ($priced as $i => $line) {
-                $return->lines()->create(['organization_id' => $organizationId, 'goods_receipt_line_id' => null, ...$line, ...$totals['lines'][$i]]);
+                $return->lines()->create(['organization_id' => $organizationId, 'goods_receipt_line_id' => null, ...$line, ...$totals['lines'][$i], 'serials' => $serials[$i] ?? null]);
             }
 
             $this->audit->record('purchase_return.posted', $return, new: [
@@ -207,5 +221,66 @@ class PostPurchaseReturn
 
             return $return;
         });
+    }
+
+    /**
+     * ST2d: the serials of the requested lines of serial-tracked variants (by line index),
+     * checked against the serials the receipt line brought in. Receipt lines posted before the
+     * register (no serials recorded) are not checked here; the register's legacy rule applies.
+     *
+     * @param  list<array<string, mixed>>  $requested
+     * @param  array<string, GoodsReceiptLine>  $receiptLines
+     * @param  array<string, array<string, mixed>>  $variants
+     * @return array<int, list<string>>
+     */
+    private function receiptSerials(array $requested, array $receiptLines, array $variants): array
+    {
+        $serials = $this->lineRules->serials(array_map(fn (array $l) => [
+            'variant_id' => $receiptLines[$l['goods_receipt_line_id']]->variant_id,
+            'quantity' => (string) $l['quantity'],
+            'serials' => $l['serials'] ?? null,
+        ], $requested), $variants);
+        $errors = [];
+        foreach ($serials as $i => $given) {
+            $received = $receiptLines[$requested[$i]['goods_receipt_line_id']]->serials;
+            if ($received === null) {
+                continue;
+            }
+            $byKey = [];
+            foreach ($received as $serial) {
+                $byKey[mb_strtolower($serial)] = $serial;
+            }
+            $unknown = array_values(array_filter($given, fn (string $s) => ! isset($byKey[mb_strtolower($s)])));
+            if ($unknown !== []) {
+                $errors["lines.{$i}.serials"] = ['Not received on this line: '.implode(', ', $unknown).'.'];
+
+                continue;
+            }
+            // The receipt's spelling.
+            $serials[$i] = array_map(fn (string $s) => $byKey[mb_strtolower($s)], $given);
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $serials;
+    }
+
+    /**
+     * ST2d: the returned serials leave the register before the stock leaves (as the register
+     * requires), one call per variant.
+     *
+     * @param  array<int, string>  $variantIds  per line
+     * @param  array<int, list<string>>  $serials  by line index
+     */
+    private function issueSerials(string $storeId, array $variantIds, array $serials, StockReference $reference): void
+    {
+        $byVariant = [];
+        foreach ($serials as $i => $given) {
+            $byVariant[$variantIds[$i]] = [...$byVariant[$variantIds[$i]] ?? [], ...$given];
+        }
+        foreach ($byVariant as $variantId => $given) {
+            $this->serialRegister->issue($storeId, $variantId, $given, SerialStatus::ReturnedToSupplier, $reference);
+        }
     }
 }

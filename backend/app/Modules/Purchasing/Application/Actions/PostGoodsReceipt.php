@@ -3,6 +3,7 @@
 namespace App\Modules\Purchasing\Application\Actions;
 
 use App\Modules\Inventory\Application\Actions\ResolveBatch;
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Services\StockLineRules;
 use App\Modules\Inventory\Application\Services\StoreAccess;
@@ -46,6 +47,9 @@ use Illuminate\Validation\ValidationException;
  * as quantity + bonus at the effective unit cost = cost × (100 − discount %) ÷ 100 × quantity ÷
  * (quantity + bonus), rounded once to 4 dp (= the unit cost without discount or bonus), plus the
  * landed cost spread over the same units. Only `quantity` counts against the order.
+ *
+ * ST2d: lines of serial-tracked variants name one serial per unit (quantity + bonus); they enter
+ * the serial register in stock at the store (SerialRegister::receive) and stay on the line.
  */
 class PostGoodsReceipt
 {
@@ -58,6 +62,7 @@ class PostGoodsReceipt
         private readonly SequenceGenerator $sequences,
         private readonly AuditTrail $audit,
         private readonly ProcurementHistory $history,
+        private readonly SerialRegister $serialRegister,
     ) {}
 
     /**
@@ -71,6 +76,7 @@ class PostGoodsReceipt
         $lines = array_values($data['lines']);
         $variants = $this->lineRules->validate($organizationId, $lines, 'in', requireTracked: false, requireSellable: true);
         $lines = $this->context->discountAndBonus($lines, $variants, $this->orderLineDefaults($data, $lines));
+        $serials = $this->lineRules->serials(array_map(fn (array $l) => ['variant_id' => $l['variant_id'], 'quantity' => Decimal::add($l['quantity'], $l['bonus_quantity'], 3), 'serials' => $l['serials'] ?? null], $lines), $variants);
 
         foreach ($lines as $i => $line) {
             $lines[$i]['tax_rate'] = Decimal::round($line['tax_rate'] ?? $variants[$line['variant_id']]['tax_rate'] ?? '0', 4);
@@ -91,7 +97,7 @@ class PostGoodsReceipt
         $charges = $this->charges(array_values($data['charges'] ?? []));
         $landed = $this->landedCosts($charges, $lines, $totals, $currency);
 
-        return DB::transaction(function () use ($actor, $organizationId, $store, $data, $lines, $totals, $currency, $dueDate, $charges, $landed) {
+        return DB::transaction(function () use ($actor, $organizationId, $store, $data, $lines, $serials, $totals, $currency, $dueDate, $charges, $landed) {
             $order = isset($data['purchase_order_id']) ? $this->lockOrder($data, $store['id'], $lines) : null;
 
             $receipt = GoodsReceipt::query()->create([
@@ -152,12 +158,17 @@ class PostGoodsReceipt
                     ...$totals['lines'][$i],
                     'landed_cost' => $landed['lines'][$i]['landed_cost'],
                     'landed_unit_cost' => $landed['lines'][$i]['landed_unit_cost'],
+                    'serials' => $serials[$i] ?? null,
                 ]);
                 // SC3: stock enters at the landed unit cost, so the weighted average includes the charges.
                 $changes[] = new StockChange($store['id'], $line['variant_id'], $batchId, MovementType::PurchaseReceipt, $line['stock_quantity'], $landed['lines'][$i]['landed_unit_cost']);
             }
 
-            $this->ledger->post($changes, new StockReference('goods_receipt', $receipt->id, $receipt->number));
+            $reference = new StockReference('goods_receipt', $receipt->id, $receipt->number);
+            $this->ledger->post($changes, $reference);
+            foreach ($serials as $i => $given) {
+                $this->serialRegister->receive($store['id'], $lines[$i]['variant_id'], $given, $reference);
+            }
             $this->recordCatalogCosts($receipt->supplier_id, $lines);
 
             if ($order !== null) {

@@ -26,9 +26,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $discount_percent ST2a: line discount %
  * @property string $bonus_quantity ST2a: free units received on top of the quantity
  * @property string $effective_unit_cost ST2a: unit_cost × (100 − discount %) / 100 × quantity / (quantity + bonus_quantity), 4 dp
+ * @property ?list<string> $serials ST2d: serial numbers received (serial-tracked variants)
  */
 #[Table(timestamps: false)]
-#[Fillable(['organization_id', 'goods_receipt_id', 'purchase_order_line_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'landed_cost', 'landed_unit_cost', 'returned_quantity', 'discount_percent', 'bonus_quantity', 'effective_unit_cost'])]
+#[Fillable(['organization_id', 'goods_receipt_id', 'purchase_order_line_id', 'variant_id', 'batch_id', 'quantity', 'unit_cost', 'tax_rate', 'line_subtotal', 'line_tax', 'line_total', 'landed_cost', 'landed_unit_cost', 'returned_quantity', 'discount_percent', 'bonus_quantity', 'effective_unit_cost', 'serials'])]
 class GoodsReceiptLine extends Model
 {
     use BelongsToOrganization, HasUuids;
@@ -48,6 +49,7 @@ class GoodsReceiptLine extends Model
             'discount_percent' => 'decimal:4',
             'bonus_quantity' => 'decimal:3',
             'effective_unit_cost' => 'decimal:4',
+            'serials' => 'array',
         ];
     }
 }

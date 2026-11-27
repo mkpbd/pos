@@ -259,6 +259,10 @@ class ExchangeTest extends TestCase
 
         $this->assertSame('1.000', $this->stockRow($phone->id, $this->store)['quantity']);
         $this->assertSame('5.000', $this->stockRow($syrup->id, $this->store)['quantity']);
+        // ST2d: the exchange goes through the return and checkout paths of the serial register.
+        $this->assertSame(['in_stock', $this->store], $this->serialRow('IMEI-1'));
+        $this->assertSame(['sold', 'returned'], $this->serialEvents('IMEI-1'));
+        $this->assertSame(['sold', null], $this->serialRow('IMEI-2'));
         $batches = collect($this->getJson("/api/v1/inventory/movements?variant_id={$syrup->id}")->json('data'))->groupBy('type')->map->count()->all();
         $this->assertSame(2, $batches['sale'] ?? 0);
         $this->assertSame(1, $batches['sale_return'] ?? 0);

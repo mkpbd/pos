@@ -26,6 +26,7 @@ use LogicException;
  * @property string $unit_cost
  * @property ?string $value value added by a value-only movement (SC3 landed_cost), else null
  * @property string $balance_after
+ * @property ?string $average_cost_after ST2d: the level's average cost right after this movement
  * @property string $reference_type
  * @property string $reference_id
  * @property ?string $reference_number
@@ -35,7 +36,7 @@ use LogicException;
 #[Table(timestamps: false)]
 #[Fillable([
     'organization_id', 'branch_id', 'store_id', 'variant_id', 'batch_id', 'type', 'quantity', 'unit_cost',
-    'value', 'balance_after', 'reference_type', 'reference_id', 'reference_number', 'created_by', 'created_at',
+    'value', 'balance_after', 'average_cost_after', 'reference_type', 'reference_id', 'reference_number', 'created_by', 'created_at',
 ])]
 class StockMovement extends Model
 {
@@ -49,6 +50,7 @@ class StockMovement extends Model
             'unit_cost' => 'decimal:4',
             'value' => 'decimal:2',
             'balance_after' => 'decimal:3',
+            'average_cost_after' => 'decimal:4',
             'created_at' => 'datetime',
         ];
     }

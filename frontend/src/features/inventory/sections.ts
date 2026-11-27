@@ -3,6 +3,9 @@ export type SectionTab = { to: string; label: string; permission?: string | stri
 
 export const INVENTORY_TABS: SectionTab[] = [
   { to: '/inventory', label: 'Stock' },
+  // ST2d: the serial number register, and stock value as of a past date (needs cost access, like the API).
+  { to: '/inventory/serials', label: 'Serial numbers' },
+  { to: '/inventory/valuation', label: 'Valuation', permission: 'products.view_cost' },
   { to: '/inventory/batches', label: 'Batches & expiry' },
   { to: '/inventory/movements', label: 'Movements' },
   { to: '/inventory/adjustments', label: 'Adjustments' },

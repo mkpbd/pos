@@ -31,6 +31,7 @@ export const EXPORTABLE_LISTS = {
   products: { label: 'Products', endpoint: '/products', route: '/products' },
   stock: { label: 'Stock levels', endpoint: '/inventory/stock', route: '/inventory' },
   batches: { label: 'Batches and expiry', endpoint: '/inventory/batches', route: '/inventory/batches' },
+  valuation: { label: 'Stock valuation', endpoint: '/inventory/valuation', route: '/inventory/valuation' },
   movements: { label: 'Stock movements', endpoint: '/inventory/movements', route: '/inventory/movements' },
   adjustments: { label: 'Stock adjustments', endpoint: '/inventory/adjustments', route: '/inventory/adjustments' },
   transfers: { label: 'Stock transfers', endpoint: '/inventory/transfers', route: '/inventory/transfers' },

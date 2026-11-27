@@ -1,5 +1,9 @@
+import type { FieldValues, Path, UseFormSetError } from 'react-hook-form'
+import { toast } from 'sonner'
 import { z } from 'zod'
 import type { LineValue } from '@/components/common/line-values'
+import { ApiError } from '@/lib/api/client'
+import { handleFormError } from '@/lib/forms'
 import { compareDecimal, decimalPattern } from '@/lib/money'
 
 const QUANTITY = /^\d{1,15}(\.\d{1,3})?$/
@@ -15,6 +19,8 @@ type Options = {
   count?: boolean
   /** ST2a purchase lines: discount % (0 to under 100) and free quantity. */
   discount?: boolean
+  /** ST2d serial-tracked products: 'in' receives serials, 'out' issues in-stock ones, 'signed' decides by the quantity's sign. */
+  serials?: 'in' | 'out' | 'signed'
 }
 
 const DISCOUNT = /^\d{1,2}(\.\d{1,4})?$/
@@ -27,6 +33,7 @@ const variantShape = z.object({
   allow_decimal: z.boolean(),
   track_stock: z.boolean(),
   track_batches: z.boolean(),
+  track_serials: z.boolean().optional(),
   purchase_price: z.string().optional(),
   tax_rate: z.string().nullable(),
 })
@@ -50,6 +57,7 @@ export function linesSchema(options: Options) {
         max_quantity: z.string().optional(),
         discount_percent: z.string().optional(),
         bonus_quantity: z.string().optional(),
+        serials: z.array(z.string()).optional(),
       }),
     )
     .min(1, 'Add at least one line.')
@@ -91,6 +99,10 @@ export function linesSchema(options: Options) {
           else if (line.variant && !line.variant.allow_decimal && bonus.includes('.') && !/\.0+$/.test(bonus)) issue('bonus_quantity', `Whole ${line.variant.unit_code ?? 'units'} only.`)
         }
 
+        const needed = serialsNeeded(line, options)
+        const count = line.serials?.length ?? 0
+        if (needed !== null && count !== needed) issue('serials', `Enter ${needed} serial number${needed === 1 ? '' : 's'} (${count} entered).`)
+
         if (line.variant?.track_batches && options.batch) {
           const mode = options.batch === 'signed' ? (negative ? 'out' : 'in') : options.batch
           if (mode === 'in' && line.batch_number.trim() === '') issue('batch_number', 'Batch number required.')
@@ -115,6 +127,7 @@ export function toApiLine(line: LineValue, options: Options & { sourceField?: st
     ...(options.discount ? { discount_percent: line.discount_percent?.trim() || '0', bonus_quantity: line.bonus_quantity?.trim() || '0' } : {}),
     ...(tracksBatches && mode === 'in' ? { batch_number: line.batch_number.trim(), expires_on: line.expires_on || null } : {}),
     ...(tracksBatches && mode === 'out' ? { batch_id: line.batch_id } : {}),
+    ...(options.serials && line.variant?.track_serials ? { serials: line.serials ?? [] } : {}),
     ...(options.sourceField && line.source_line_id ? { [options.sourceField]: line.source_line_id } : {}),
   }
 }
@@ -127,4 +140,50 @@ export function toCountApiLine(line: LineValue, options: Pick<Options, 'cost'>) 
     ...(options.cost ? { unit_cost: line.unit_cost.trim() || null } : {}),
     ...(line.variant?.track_batches ? { batch_id: line.batch_id } : {}),
   }
+}
+
+/**
+ * ST2d: how many serial numbers a line of a serial-tracked product needs — one per unit moved
+ * (received lines count the free units too); null when the line needs none or its quantity is
+ * not a whole number yet.
+ */
+export function serialsNeeded(line: Pick<LineValue, 'quantity' | 'bonus_quantity'> & { variant: { track_serials?: boolean } | null }, options: Pick<Options, 'serials' | 'discount'>): number | null {
+  if (!options.serials || !line.variant?.track_serials) return null
+  const quantity = line.quantity.trim().replace(/^-/, '')
+  const bonus = options.discount ? (line.bonus_quantity ?? '').trim() || '0' : '0'
+  if (!/^\d+(\.0+)?$/.test(quantity) || !/^\d+(\.0+)?$/.test(bonus)) return null
+  return Math.trunc(Number(quantity)) + Math.trunc(Number(bonus))
+}
+
+/** 'in' or 'out' for a line under a serials option ('signed' decides by the quantity's sign). */
+export function serialsMode(options: Pick<Options, 'serials'>, quantity: string): 'in' | 'out' | null {
+  if (!options.serials) return null
+  return options.serials === 'signed' ? (quantity.trim().startsWith('-') ? 'out' : 'in') : options.serials
+}
+
+const SERIAL_ERRORS: Record<string, string> = { SERIAL_NOT_IN_STOCK: 'Not in stock at this store', SERIAL_IN_STOCK: 'Already in stock' }
+
+/**
+ * ST2d: a SERIAL_NOT_IN_STOCK / SERIAL_IN_STOCK refusal (`details.serials`) as errors on the
+ * lines holding those serials (matched case-insensitively), e.g. `lines.0.serials`.
+ */
+export function serialErrors(error: unknown, lines: { serials?: string[] }[]): { path: `lines.${number}.serials`; message: string }[] {
+  if (!(error instanceof ApiError) || !(error.code in SERIAL_ERRORS)) return []
+  const refused = Array.isArray(error.details.serials) ? (error.details.serials as unknown[]).map(String) : []
+  const lower = new Set(refused.map((s) => s.toLowerCase()))
+  return lines.flatMap((line, i) => {
+    const hit = (line.serials ?? []).filter((s) => lower.has(s.toLowerCase()))
+    return hit.length > 0 ? [{ path: `lines.${i}.serials` as const, message: `${SERIAL_ERRORS[error.code]}: ${hit.join(', ')}` }] : []
+  })
+}
+
+/** handleFormError for document forms with lines, placing serial refusals at the lines' serials. */
+export function handleLinesError<T extends FieldValues>(error: unknown, setError: UseFormSetError<T>, fields: readonly Path<T>[], lines: { serials?: string[] }[]): void {
+  const found = serialErrors(error, lines)
+  if (found.length === 0) {
+    handleFormError(error, setError, fields, { nested: true })
+    return
+  }
+  for (const f of found) setError(f.path as Path<T>, { type: 'server', message: f.message })
+  toast.error((error as Error).message)
 }

@@ -15,6 +15,8 @@ export type LineValue = {
   /** ST2a purchase lines: line discount % and free (bonus) units received on top of the quantity. */
   discount_percent?: string
   bonus_quantity?: string
+  /** ST2d serial-tracked products: one serial number per unit (received units include the free ones). */
+  serials?: string[]
   /**
    * ST2c front-end helper (never sent): the chosen pack's barcode ('' = single units), the number
    * of packs and the cost of one pack; they fill `quantity` and `unit_cost`.

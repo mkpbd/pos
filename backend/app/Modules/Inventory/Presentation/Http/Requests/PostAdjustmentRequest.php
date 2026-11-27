@@ -29,6 +29,9 @@ class PostAdjustmentRequest extends FormRequest
             'lines.*.batch_id' => ['nullable', 'uuid'],
             'lines.*.batch_number' => ['nullable', 'string', 'max:64'],
             'lines.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
+            // ST2d: one serial per unit of serial-numbered products (count = quantity / counted difference).
+            'lines.*.serials' => ['nullable', 'array', 'max:10000'],
+            'lines.*.serials.*' => ['string', 'max:100'],
         ];
     }
 

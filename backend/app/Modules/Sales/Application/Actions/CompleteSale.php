@@ -2,9 +2,11 @@
 
 namespace App\Modules\Sales\Application\Actions;
 
+use App\Modules\Inventory\Application\Contracts\SerialRegister;
 use App\Modules\Inventory\Application\Contracts\StockLedger;
 use App\Modules\Inventory\Application\Services\StoreAccess;
 use App\Modules\Inventory\Domain\MovementType;
+use App\Modules\Inventory\Domain\SerialStatus;
 use App\Modules\Inventory\Domain\StockChange;
 use App\Modules\Inventory\Domain\StockReference;
 use App\Modules\Payments\Application\Contracts\PaymentLedger;
@@ -63,6 +65,8 @@ class CompleteSale
         private readonly TillCheckout $tillCheckout,
         // POS1b: store credit and gift card tenders.
         private readonly StoredValueTenders $storedValue,
+        // ST2d: sold serials leave the serial register.
+        private readonly SerialRegister $serialRegister,
     ) {}
 
     /**
@@ -92,7 +96,7 @@ class CompleteSale
             ]);
         }
         $lines = array_values($data['lines']);
-        $serials = $this->serials($organizationId, $lines, $variants);
+        $serials = $this->serials($lines, $variants);
 
         $currency = $priced['currency'];
         $this->storedValue->assertTenders(array_values($data['payments'] ?? []), $customer);
@@ -142,7 +146,9 @@ class CompleteSale
                     $changes[$i] = new StockChange($store['id'], $line['variant_id'], null, MovementType::Sale, $line['quantity'], allocateBatches: true);
                 }
             }
-            $posted = $this->stockLedger->post(array_values($changes), new StockReference('sale', $saleId, $number));
+            $reference = new StockReference('sale', $saleId, $number);
+            $this->issueSerials($organizationId, $store['id'], array_values($data['lines']), $serials, $reference);
+            $posted = $this->stockLedger->post(array_values($changes), $reference);
             $stock = array_combine(array_keys($changes), $posted);
 
             $costs = [];
@@ -298,7 +304,7 @@ class CompleteSale
     }
 
     /**
-     * Serial numbers for serial-tracked products: one per unit, unique, and not already sold.
+     * Serial numbers for serial-tracked products: one per unit and none entered twice.
      *
      * @param  list<array<string, mixed>>  $lines
      * @param  array<string, array<string, mixed>>  $variants
@@ -306,7 +312,7 @@ class CompleteSale
      *
      * @throws ValidationException
      */
-    private function serials(string $organizationId, array $lines, array $variants): array
+    private function serials(array $lines, array $variants): array
     {
         $errors = [];
         $result = [];
@@ -340,7 +346,36 @@ class CompleteSale
             $result[$i] = $given;
         }
 
-        foreach ($result as $i => $given) {
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $result;
+    }
+
+    /**
+     * ST2d: the sold serials leave the register (SERIAL_NOT_IN_STOCK unless in stock at the store,
+     * or unknown while the store holds unregistered units), one call per variant, before the
+     * stock leaves. Serials sold before the register (still on an uncancelled, unreturned sale
+     * line) are refused too.
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @param  array<int, list<string>>  $serials
+     *
+     * @throws ValidationException|BusinessRuleViolation
+     */
+    private function issueSerials(string $organizationId, string $storeId, array $lines, array $serials, StockReference $reference): void
+    {
+        $byVariant = [];
+        foreach ($serials as $i => $given) {
+            $byVariant[$lines[$i]['variant_id']] = [...$byVariant[$lines[$i]['variant_id']] ?? [], ...$given];
+        }
+        foreach ($byVariant as $variantId => $given) {
+            $this->serialRegister->issue($storeId, $variantId, $given, SerialStatus::Sold, $reference);
+        }
+
+        $errors = [];
+        foreach ($serials as $i => $given) {
             $sold = SaleLineSerial::query()
                 ->where('organization_id', $organizationId)
                 ->where('variant_id', $lines[$i]['variant_id'])
@@ -352,11 +387,8 @@ class CompleteSale
                 $errors["lines.{$i}.serials"] = ['Already sold: '.implode(', ', $sold).'.'];
             }
         }
-
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
-
-        return $result;
     }
 }

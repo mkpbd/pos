@@ -14,6 +14,9 @@ class PostPurchaseReturnRequest extends FormRequest
             'lines' => ['required', 'array', 'min:1', 'max:500'],
             'lines.*.goods_receipt_line_id' => ['required', 'uuid'],
             'lines.*.quantity' => ['required', 'regex:/^\d{1,15}(\.\d{1,3})?$/', 'not_regex:/^0+(\.0+)?$/'],
+            // ST2d: one serial number per unit returned of a serial-tracked variant.
+            'lines.*.serials' => ['sometimes', 'nullable', 'array', 'max:10000'],
+            'lines.*.serials.*' => ['string', 'max:100'],
         ];
     }
 }

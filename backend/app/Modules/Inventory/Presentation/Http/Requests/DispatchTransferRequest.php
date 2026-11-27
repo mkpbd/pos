@@ -16,6 +16,9 @@ class DispatchTransferRequest extends FormRequest
             'lines.*.variant_id' => ['required', 'uuid'],
             'lines.*.quantity' => ['required', 'regex:/^\d{1,15}(\.\d{1,3})?$/', 'not_regex:/^0+(\.0+)?$/'],
             'lines.*.batch_id' => ['nullable', 'uuid'],
+            // ST2d: one serial per unit of serial-numbered products (ignored on a request).
+            'lines.*.serials' => ['nullable', 'array', 'max:10000'],
+            'lines.*.serials.*' => ['string', 'max:100'],
         ];
     }
 

@@ -238,7 +238,7 @@ class CheckoutTest extends TestCase
             ->json('data');
 
         $this->checkout($this->cart($store, [[$phone, '1', ['serials' => ['imei-2']]]], [['card', '20000']]))
-            ->assertStatus(422)->assertJsonPath('error.details', ['lines.0.serials' => ['Already sold: IMEI-2.']]);
+            ->assertStatus(422)->assertJsonPath('error.code', 'SERIAL_NOT_IN_STOCK')->assertJsonPath('error.details.serials', ['IMEI-2']);
 
         // Cancelling the sale releases the serials.
         $this->postJson("/api/v1/sales/{$sale['id']}/cancel", ['reason' => 'Wrong model'])->assertOk();
