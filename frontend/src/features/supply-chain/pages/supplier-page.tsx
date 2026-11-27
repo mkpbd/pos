@@ -18,7 +18,7 @@ function Details({ supplier }: { supplier: Supplier }) {
     ['Contact person', supplier.contact_person],
     ['Phone', supplier.phone],
     ['E-mail', supplier.email],
-    ['Tax / BIN number', supplier.tax_number],
+    ['BIN', supplier.tax_number],
     ['Payment terms', supplier.payment_terms_days ? `${supplier.payment_terms_days} days` : 'Cash'],
     ['Address', supplier.address],
     ['Notes', supplier.notes],

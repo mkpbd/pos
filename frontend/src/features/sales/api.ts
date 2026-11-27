@@ -143,6 +143,8 @@ export type Sale = SaleHeader & {
   exchange?: SaleExchange | null
   /** POS1d: receipts sent by SMS / e-mail, newest first (absent before POS1d). */
   receipt_deliveries?: SaleReceiptDelivery[]
+  /** VAT1: the Mushak-6.3 tax invoice data; null (or absent) when the shop has no BIN. */
+  mushak?: Mushak | null
   receipt: {
     organization_name: string | null
     /** Seller BIN (organization tax number); printed under the shop name when set (Q1 §3). */
@@ -156,6 +158,38 @@ export type Sale = SaleHeader & {
     /** POS1b: the customer's store credit after the sale (null / absent for walk-in sales). */
     customer_store_credit_balance?: string | null
   }
+}
+
+/**
+ * VAT1: one line of a Mushak-6.3 invoice, from the stored line snapshot (nothing recomputed).
+ * `unit_price` / `value` exclude VAT (value is after discounts); SD is always 0 for now.
+ */
+export type MushakLine = {
+  description: string
+  unit: string | null
+  quantity: string
+  unit_price: string
+  value: string
+  sd_rate: string
+  sd_amount: string
+  vat_rate: string
+  vat_amount: string
+  total: string
+}
+
+/** VAT1: the Mushak-6.3 tax invoice block of a sale or web order document. */
+export type Mushak = {
+  form: string
+  seller: { name: string; bin: string; address: string | null }
+  buyer: { name: string; bin: string | null; address: string | null }
+  invoice_number: string
+  /** ISO, organization timezone. */
+  issued_at: string
+  lines: MushakLine[]
+  totals: { value: string; sd: string; vat: string; total: string }
+  prices_include_tax: boolean
+  /** Web orders: the order was cancelled (the invoice prints with a "Cancelled" stamp). */
+  cancelled?: boolean
 }
 
 /** POS1d: how a receipt is sent to the customer. */

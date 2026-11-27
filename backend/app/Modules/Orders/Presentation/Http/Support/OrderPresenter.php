@@ -25,6 +25,7 @@ use App\Modules\Orders\Infrastructure\Models\Shipment;
 use App\Modules\Orders\Infrastructure\Models\ShipmentEvent;
 use App\Modules\Payments\Application\Contracts\PaymentLedger;
 use App\Modules\Payments\Domain\PaymentSource;
+use App\Modules\Sales\Domain\MushakInvoice;
 use App\Modules\Sales\Domain\TaxMode;
 use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use App\Modules\Shared\Domain\ValueObjects\Money;
@@ -392,11 +393,12 @@ class OrderPresenter
 
     /**
      * An order as printed (E10a): `packing_slip` (no prices) or `invoice` (prices, discounts,
-     * tax, totals). Read-only.
+     * tax, totals; VAT1: `mushak`, the Mushak-6.3 block, null without the seller's BIN). Read-only.
      *
+     * @param  array<string, mixed>  $organization  OrganizationDirectory::summary of the order's organization
      * @return array<string, mixed>
      */
-    public function printable(Order $order, string $kind): array
+    public function printable(Order $order, string $kind, array $organization): array
     {
         $view = $this->storefront($order);
         $invoice = $kind === 'invoice';
@@ -457,7 +459,54 @@ class OrderPresenter
             'total' => $view['total'],
             'paid_total' => (string) $order->paid_total,
             'balance_due' => Decimal::sub((string) $order->total, (string) $order->paid_total, 2),
+            'mushak' => $this->mushak($order, $organization),
         ];
+    }
+
+    /**
+     * VAT1: the Mushak-6.3 block of a web order — the buyer is the order's contact name and
+     * shipping address with the linked customer's BIN; issued when placed (the date the invoice
+     * prints), in the organization's timezone. Product lines only (delivery and COD fees carry no
+     * VAT). Cancelled orders keep it, marked `cancelled`.
+     *
+     * @param  array<string, mixed>  $organization
+     * @return array<string, mixed>|null
+     */
+    private function mushak(Order $order, array $organization): ?array
+    {
+        $bin = trim((string) ($organization['tax_number'] ?? ''));
+        if ($bin === '') {
+            return null;
+        }
+        $address = $order->shippingAddress;
+        $customer = $order->customer_id === null ? null : $this->customers->invoiceDetails($order->organization_id, $order->customer_id);
+
+        return MushakInvoice::of(
+            ['name' => filled($organization['legal_name'] ?? null) ? $organization['legal_name'] : (string) ($organization['name'] ?? ''), 'bin' => $bin,
+                'address' => $organization['address'] ?? null],
+            [
+                'name' => $order->contact_name,
+                'bin' => $customer['tax_number'] ?? null,
+                'address' => $address === null ? null : implode(', ', array_filter(
+                    [$address->address_line, $address->area, $address->district_name, trim($address->division_name.' '.$address->postcode)],
+                    fn (?string $part) => $part !== null && trim($part) !== '',
+                )),
+            ],
+            $order->number,
+            $order->placed_at->setTimezone($organization['timezone'] ?? config('app.timezone'))->toIso8601String(),
+            $order->lines->values()->map(fn (OrderLine $l) => [
+                'description' => MushakInvoice::description($l->product_name, $l->variant_name),
+                'unit' => null,
+                'quantity' => (string) $l->quantity,
+                'unit_price' => (string) $l->unit_price,
+                'net_amount' => (string) $l->net_amount,
+                'tax_rate' => (string) $l->tax_rate,
+                'tax_amount' => (string) $l->tax_amount,
+                'line_total' => (string) $l->line_total,
+            ])->all(),
+            $order->tax_mode === TaxMode::Inclusive,
+            $order->cancelled_at !== null,
+        );
     }
 
     /**

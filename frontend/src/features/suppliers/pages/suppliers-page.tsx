@@ -93,7 +93,7 @@ function SupplierDialog({ supplier, open, onOpenChange }: { supplier: Supplier |
           <FormField label="Contact person" error={errors.contact_person?.message}><Input {...form.register('contact_person')} /></FormField>
           <FormField label="Phone" error={errors.phone?.message}><Input type="tel" {...form.register('phone')} /></FormField>
           <FormField label="E-mail" error={errors.email?.message}><Input type="email" {...form.register('email')} /></FormField>
-          <FormField label="Tax / BIN number" error={errors.tax_number?.message}><Input {...form.register('tax_number')} /></FormField>
+          <FormField label="BIN" error={errors.tax_number?.message}><Input {...form.register('tax_number')} /></FormField>
           <FormField label="Payment terms (days)" error={errors.payment_terms_days?.message}><Input inputMode="numeric" {...form.register('payment_terms_days')} /></FormField>
           <FormField label="Opening balance (we owe)" error={errors.opening_balance?.message} hint="Amount owed when you started using the system.">
             <Input inputMode="decimal" {...form.register('opening_balance')} />

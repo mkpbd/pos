@@ -4,6 +4,7 @@ import { ArrowLeftIcon, PrinterIcon } from 'lucide-react'
 import { EmptyState, ErrorState, LoadingState } from '@/components/common/state-views'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/features/auth/use-auth'
+import { MushakInvoice } from '@/features/sales/components/receipt'
 import { usePrintQuery, type PrintDocument, type PrintKind, type PrintOrder, type PrintOrganization } from '@/features/web-orders/api'
 import { formatDateTime, PAYMENT_METHOD_LABELS, paymentBadge, PRINT_KIND_LABELS, printParams, promotionKindLabel } from '@/features/web-orders/orders'
 import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
@@ -68,9 +69,29 @@ function Totals({ order }: { order: PrintOrder }) {
   )
 }
 
+/**
+ * VAT1: delivery and the COD fee are outside the Mushak-6.3 lines (product lines only), so with
+ * either one the sheet adds them and the amount payable below the tax invoice.
+ */
+function Charges({ order }: { order: PrintOrder }) {
+  const delivery = order.shipping_total !== undefined && !isZeroDecimal(order.shipping_total)
+  const cod = !isZeroDecimal(order.cod_fee)
+  if ((!delivery && !cod) || order.total === undefined) return null
+  return (
+    <dl className="mt-3 ml-auto grid w-full max-w-xs grid-cols-[1fr_auto] gap-x-4 gap-y-0.5" aria-label={`Charges of ${order.number}`}>
+      {delivery && <><dt>Delivery</dt><dd className="text-right font-mono">{formatMoney(order.shipping_total)}</dd></>}
+      {cod && <><dt>Cash on delivery fee</dt><dd className="text-right font-mono">{formatMoney(order.cod_fee)}</dd></>}
+      <dt className="border-t border-neutral-400 pt-1 font-bold">Amount payable</dt>
+      <dd className="border-t border-neutral-400 pt-1 text-right font-mono font-bold">{formatMoney(order.total, order.currency)}</dd>
+    </dl>
+  )
+}
+
 function Sheet({ doc, order, timeZone }: { doc: PrintDocument; order: PrintOrder; timeZone: string | undefined }) {
   const invoice = doc.kind === 'invoice'
   const a = order.shipping_address
+  // VAT1: a shop with a BIN prints the invoice's lines and totals as Mushak-6.3; the rest stays.
+  const mushak = invoice ? order.mushak ?? null : null
   return (
     <article className="print-sheet mx-auto flex w-full max-w-[210mm] flex-col gap-4 bg-white p-8 text-black shadow-md print:shadow-none" aria-label={`${PRINT_KIND_LABELS[doc.kind]} ${order.number}`}>
       <OrgHeader organization={doc.organization} kind={doc.kind} />
@@ -108,6 +129,12 @@ function Sheet({ doc, order, timeZone }: { doc: PrintDocument; order: PrintOrder
         </div>
       </div>
 
+      {mushak ? (
+        <div className="text-sm">
+          <MushakInvoice mushak={mushak} timeZone={timeZone} cancelled={mushak.cancelled === true} />
+          <Charges order={order} />
+        </div>
+      ) : (
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-neutral-400 text-left">
@@ -144,8 +171,9 @@ function Sheet({ doc, order, timeZone }: { doc: PrintDocument; order: PrintOrder
           ))}
         </tbody>
       </table>
+      )}
 
-      {invoice && <Totals order={order} />}
+      {invoice && !mushak && <Totals order={order} />}
       {order.notes && <p className="text-sm"><span className="font-semibold">Customer note:</span> {order.notes}</p>}
     </article>
   )

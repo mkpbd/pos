@@ -34,7 +34,8 @@ export type ReportColumn = {
   sortable: boolean
 }
 
-export type ParamType = 'date' | 'id' | 'enum' | 'integer' | 'boolean' | 'string'
+/** `month` (VAT1): a calendar month, YYYY-MM. */
+export type ParamType = 'date' | 'month' | 'id' | 'enum' | 'integer' | 'boolean' | 'string'
 
 export type ParamOption = { value: string; label: string }
 
@@ -101,6 +102,7 @@ const KNOWN_PARAM_LABELS: Record<string, string> = {
   date_from: 'From',
   date_to: 'To',
   as_of: 'As of',
+  month: 'Month',
   branch_id: 'Branch',
   store_id: 'Store',
   product_id: 'Product',
@@ -179,6 +181,8 @@ function fromRules(rules: unknown): Partial<Record<string, unknown>> {
 function inferType(key: string, declared: string | null): ParamType {
   const t = (declared ?? '').toLowerCase()
   if (t === 'date' || t === 'date_range') return 'date'
+  // VAT1: `month` (YYYY-MM), also when the server declares the `month` key as a plain string.
+  if (t === 'month' || (key === 'month' && (t === '' || t === 'string'))) return 'month'
   if (t === 'uuid' || t === 'id' || t === 'ulid' || t === 'entity' || t === 'reference') return 'id'
   if (t === 'enum' || t === 'select' || t === 'in') return 'enum'
   if (t === 'integer' || t === 'int' || t === 'number' || t === 'numeric') return 'integer'

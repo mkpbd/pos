@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { addDecimal, compareDecimal, formatMoney, isZeroDecimal, subtractDecimal, sumDecimals, trimDecimal } from '@/lib/money'
 import { cn } from '@/lib/utils'
-import { lineLabel, type Sale, type SaleExchange, type SaleLine } from '@/features/sales/api'
+import { lineLabel, type Mushak, type Sale, type SaleExchange, type SaleLine } from '@/features/sales/api'
 import { paymentRowLabel } from '@/features/sales/payment-label'
 import type { ReceiptFormat } from '@/features/sales/receipt-formats'
 
@@ -31,9 +31,13 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
   const branch = sale.receipt.branch
   const discount = addDecimal(sale.item_discount_total, sale.invoice_discount_total, 2)
   const payments = sale.payments.filter((p) => p.kind === 'payment')
-  const bin = sale.receipt.tax_number?.trim() || null
+  // VAT1: the Mushak-6.3 block, present only when the shop has a BIN.
+  const mushak = sale.mushak ?? null
+  const bin = sale.receipt.tax_number?.trim() || mushak?.seller.bin || null
   // Only a seller with a BIN issues a tax invoice; without one the document is a plain receipt.
   const taxInvoice = (sale.receipt.is_tax_invoice ?? true) && !!bin
+  // On A4 the 6.3 table and totals replace the plain line table and totals; the rest stays.
+  const mushakA4 = mushak && !thermal ? mushak : null
 
   return (
     <div
@@ -56,10 +60,12 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
 
       <Rule thermal={thermal} />
       <div className={cn(!thermal && 'mb-3 grid grid-cols-2 gap-1')}>
+        {mushak && thermal && <div className="font-bold">Mushak-6.3</div>}
         <div>{taxInvoice ? 'Tax invoice' : 'Receipt'}: <b>{sale.number}</b></div>
         <div>{formatDate(sale.sold_at, sale.receipt.timezone)}</div>
         {sale.cashier?.name && <div>Cashier: {sale.cashier.name}</div>}
         <div>Customer: {sale.customer ? `${sale.customer.name}${sale.customer.phone ? ` (${sale.customer.phone})` : ''}` : 'Walk-in'}</div>
+        {thermal && mushak?.buyer.bin && <div>Buyer BIN: {mushak.buyer.bin}</div>}
       </div>
       {sale.status === 'cancelled' && <div className="my-1 border border-black text-center font-bold">CANCELLED</div>}
       <Rule thermal={thermal} />
@@ -73,7 +79,9 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
         </>
       )}
 
-      {thermal ? (
+      {mushakA4 ? (
+        <MushakInvoice mushak={mushakA4} timeZone={sale.receipt.timezone} cancelled={mushakA4.cancelled === true || sale.status === 'cancelled'} />
+      ) : thermal ? (
         <div className="flex flex-col gap-1">
           {sale.lines.map((l) => (
             <div key={l.id}>
@@ -84,6 +92,7 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
               </div>
               {priceChanged(l) && l.price_approved_by?.name && <div>  price approved by {l.price_approved_by.name}</div>}
               {!isZeroDecimal(l.discount_amount) && <div className="flex justify-between"><span>  {l.promotion ? l.promotion.name : 'discount'}</span><span>-{formatMoney(l.discount_amount)}</span></div>}
+              {mushak && <div className="flex justify-between"><span>  {mushak.prices_include_tax ? 'incl. VAT' : 'VAT'} {trimDecimal(l.tax_rate)}%</span><span>{formatMoney(l.tax_amount)}</span></div>}
               {l.serials.length > 0 && <div>  S/N: {l.serials.join(', ')}</div>}
               {l.batches.map((b) => <div key={`${b.batch_number}`}>  Batch {b.batch_number}{b.expires_on ? ` exp ${b.expires_on}` : ''}</div>)}
             </div>
@@ -126,15 +135,19 @@ export function Receipt({ sale, format }: { sale: Sale; format: ReceiptFormat })
 
       <Rule thermal={thermal} />
       <div className={cn('flex flex-col', !thermal && 'ml-auto w-72 gap-0.5')}>
-        <Row label="Subtotal" value={formatMoney(sale.subtotal)} />
-        {!isZeroDecimal(discount) && <Row label="Discount" value={`-${formatMoney(discount)}`} />}
-        {/* POS1a: the offers inside the discount above, and the coupon. */}
-        {(sale.promotions ?? []).filter((p) => !isZeroDecimal(p.amount)).map((p, i) => (
-          <Row key={`${p.name}-${i}`} label={`  incl. ${p.name}`} value={`-${formatMoney(p.amount)}`} />
-        ))}
-        {sale.coupon_code && <Row label="Coupon" value={sale.coupon_code} />}
-        <Row label={sale.tax_mode === 'inclusive' ? 'Tax (included)' : 'Tax'} value={formatMoney(sale.tax_total)} />
-        <Row label="TOTAL" value={formatMoney(sale.total, c)} bold />
+        {!mushakA4 && (
+          <>
+            <Row label="Subtotal" value={formatMoney(sale.subtotal)} />
+            {!isZeroDecimal(discount) && <Row label="Discount" value={`-${formatMoney(discount)}`} />}
+            {/* POS1a: the offers inside the discount above, and the coupon. */}
+            {(sale.promotions ?? []).filter((p) => !isZeroDecimal(p.amount)).map((p, i) => (
+              <Row key={`${p.name}-${i}`} label={`  incl. ${p.name}`} value={`-${formatMoney(p.amount)}`} />
+            ))}
+            {sale.coupon_code && <Row label="Coupon" value={sale.coupon_code} />}
+            <Row label={sale.tax_mode === 'inclusive' ? 'Tax (included)' : 'Tax'} value={formatMoney(sale.tax_total)} />
+            <Row label="TOTAL" value={formatMoney(sale.total, c)} bold />
+          </>
+        )}
         {payments.map((p) => {
           // POS1b: a gift card row's reference names the card ("Gift card ••••1234").
           const { label, reference } = paymentRowLabel(p)
@@ -173,6 +186,81 @@ function ExchangeSection({ exchange, thermal, currency }: { exchange: SaleExchan
       {compareDecimal(owed, '0') > 0 && <Row label="Against amount owed" value={formatMoney(owed)} />}
       <Row label="Returned value" value={`-${formatMoney(exchange.value, currency)}`} bold />
       {compareDecimal(refunded, '0') > 0 && <Row label="Refunded to customer" value={formatMoney(refunded, currency)} />}
+    </div>
+  )
+}
+
+/**
+ * VAT1: the Mushak-6.3 tax invoice on A4 — seller and buyer with their BINs, invoice number and
+ * time of issue, the lines (value excl. VAT, SD, VAT rate, VAT, total), totals and a signature line.
+ * Every figure is the server's (stored line snapshots); nothing is computed here. Shared with the
+ * web order print page.
+ */
+export function MushakInvoice({ mushak, timeZone, cancelled = false }: { mushak: Mushak; timeZone: string | null | undefined; cancelled?: boolean }) {
+  const t = mushak.totals
+  return (
+    <div className="relative flex flex-col gap-4" data-testid="mushak-invoice">
+      {cancelled && (
+        <div className="pointer-events-none absolute top-24 left-1/2 -translate-x-1/2 -rotate-12 border-4 border-red-700 px-6 py-1 text-3xl font-bold tracking-widest text-red-700 uppercase opacity-80" data-testid="cancelled-stamp">
+          Cancelled
+        </div>
+      )}
+      <div className="text-center text-lg font-bold">Mushak-6.3 — Tax invoice</div>
+      <div className="grid grid-cols-2 gap-4">
+        <div data-testid="mushak-seller">
+          <div className="text-xs font-semibold text-gray-600 uppercase">Seller</div>
+          <div className="font-bold">{mushak.seller.name}</div>
+          <div>BIN: {mushak.seller.bin}</div>
+          {mushak.seller.address && <div className="whitespace-pre-line">{mushak.seller.address}</div>}
+        </div>
+        <div data-testid="mushak-buyer">
+          <div className="text-xs font-semibold text-gray-600 uppercase">Buyer</div>
+          <div className="font-bold">{mushak.buyer.name}</div>
+          <div>BIN: {mushak.buyer.bin ?? '—'}</div>
+          {mushak.buyer.address && <div className="whitespace-pre-line">{mushak.buyer.address}</div>}
+        </div>
+      </div>
+      <div className="flex flex-wrap justify-between gap-2">
+        <div>Invoice no.: <b>{mushak.invoice_number}</b></div>
+        <div>Date & time of issue: {formatDate(mushak.issued_at, timeZone ?? null)}</div>
+      </div>
+      <table className="w-full border-collapse text-left text-xs">
+        <thead>
+          <tr className="border-y border-black">
+            <th className="py-1 pr-1">Description</th>
+            <th className="py-1 pr-1">Unit</th>
+            <th className="py-1 pr-1 text-right">Qty</th>
+            <th className="py-1 pr-1 text-right">Unit price</th>
+            <th className="py-1 pr-1 text-right">Value</th>
+            <th className="py-1 pr-1 text-right">SD</th>
+            <th className="py-1 pr-1 text-right">VAT rate</th>
+            <th className="py-1 pr-1 text-right">VAT</th>
+            <th className="py-1 text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {mushak.lines.map((l, i) => (
+            <tr key={i} className="border-b border-gray-300 align-top">
+              <td className="py-1 pr-1">{l.description}</td>
+              <td className="py-1 pr-1">{l.unit ?? ''}</td>
+              <td className="py-1 pr-1 text-right">{trimDecimal(l.quantity)}</td>
+              <td className="py-1 pr-1 text-right">{formatMoney(l.unit_price)}</td>
+              <td className="py-1 pr-1 text-right">{formatMoney(l.value)}</td>
+              <td className="py-1 pr-1 text-right">{formatMoney(l.sd_amount)}</td>
+              <td className="py-1 pr-1 text-right">{trimDecimal(l.vat_rate)}%</td>
+              <td className="py-1 pr-1 text-right">{formatMoney(l.vat_amount)}</td>
+              <td className="py-1 text-right">{formatMoney(l.total)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="ml-auto flex w-72 flex-col gap-0.5" data-testid="mushak-totals">
+        <Row label="Value (excl. VAT)" value={formatMoney(t.value)} />
+        <Row label="Supplementary duty" value={formatMoney(t.sd)} />
+        <Row label={mushak.prices_include_tax ? 'VAT (included in prices)' : 'VAT'} value={formatMoney(t.vat)} />
+        <Row label="Total" value={formatMoney(t.total)} bold />
+      </div>
+      <div className="mt-12 ml-auto w-56 border-t border-black pt-1 text-center">Authorised signature</div>
     </div>
   )
 }

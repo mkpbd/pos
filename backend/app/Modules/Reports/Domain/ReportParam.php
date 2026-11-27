@@ -6,6 +6,7 @@ namespace App\Modules\Reports\Domain;
  * One typed parameter of a report — what the filter bar renders and what the AI's report
  * tools (Phase 8) may pass. Types:
  *   date     Y-m-d in the organization's timezone (date_from / date_to)
+ *   month    Y-m, a calendar month in the organization's timezone (VAT1: the monthly VAT summary)
  *   entity   a uuid of `entity` (branch, store, product, category, brand, cashier, supplier,
  *            customer) that must belong to the organization (and, for branch and store, be
  *            accessible to the user)
@@ -40,6 +41,11 @@ final readonly class ReportParam
     public static function dateTo(): self
     {
         return new self('date_to', 'To', 'date', required: true);
+    }
+
+    public static function month(): self
+    {
+        return new self('month', 'Month', 'month', required: true);
     }
 
     public static function entity(string $name, string $label, string $entity): self

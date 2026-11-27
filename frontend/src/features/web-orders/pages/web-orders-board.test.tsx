@@ -263,6 +263,63 @@ describe('print view', () => {
     expect(print).toHaveBeenCalledTimes(2)
   })
 
+  // VAT1: a shop with a BIN prints its invoices as Mushak-6.3; a cancelled order gets a stamp.
+  const mushakDoc = (cancelled: boolean) => {
+    const d = doc('invoice')
+    const [first] = d.orders
+    return {
+      ...d,
+      orders: [{
+        ...first,
+        mushak: {
+          form: 'Mushak-6.3',
+          seller: { name: 'Corner Shop Ltd', bin: 'BIN-0042', address: 'House 1, Dhanmondi, Dhaka' },
+          buyer: { name: 'Ayesha Rahman', bin: null, address: 'House 12, Road 5, Dhanmondi, Dhaka' },
+          invoice_number: 'WEB-000001', issued_at: '2026-10-31T10:30:00+06:00',
+          lines: [{ description: 'Baby Romper — Size M', unit: 'pcs', quantity: '2.000', unit_price: '652.17', value: '1260.87', sd_rate: '0.00', sd_amount: '0.00', vat_rate: '15.00', vat_amount: '189.13', total: '1450.00' }],
+          totals: { value: '1260.87', sd: '0.00', vat: '189.13', total: '1450.00' },
+          prices_include_tax: true, cancelled,
+        },
+      }],
+    }
+  }
+
+  it('prints a Mushak-6.3 invoice when the order carries the block', async () => {
+    mockApi({ 'GET /auth/me': ok(orderViewer()), 'GET /web-orders/print': ok(mushakDoc(false)) })
+    renderRoutes(routes, '/web-orders/print?ids=wo-1&kind=invoice')
+
+    const sheet = await screen.findByRole('article', { name: 'Invoice WEB-000001' })
+    expect(within(sheet).getByText('Mushak-6.3 — Tax invoice')).toBeInTheDocument()
+    expect(within(sheet).getByTestId('mushak-seller')).toHaveTextContent('BIN: BIN-0042')
+    expect(within(sheet).getByTestId('mushak-buyer')).toHaveTextContent('Ayesha Rahman')
+    expect(within(sheet).getByTestId('mushak-buyer')).toHaveTextContent('BIN: —')
+    expect(within(sheet).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Description', 'Unit', 'Qty', 'Unit price', 'Value', 'SD', 'VAT rate', 'VAT', 'Total'])
+    expect(within(sheet).getByTestId('mushak-totals')).toHaveTextContent('VAT (included in prices)189.13')
+    expect(within(sheet).getByTestId('mushak-totals')).toHaveTextContent('Total1,450.00')
+    expect(within(sheet).getByText('Authorised signature')).toBeInTheDocument()
+    expect(within(sheet).queryByTestId('cancelled-stamp')).not.toBeInTheDocument()
+    expect(within(sheet).queryByLabelText('Totals of WEB-000001')).not.toBeInTheDocument()
+    // The rest of the invoice stays: shop header, ship to, payment & delivery, charges outside the VAT lines, note.
+    expect(within(sheet).getByText('BIN / Tax no. BIN-0042')).toBeInTheDocument()
+    expect(within(sheet).getByText(/House 12, Road 5/, { selector: 'address' })).toBeInTheDocument()
+    expect(within(sheet).getByText(/Cash on delivery · Unpaid/)).toBeInTheDocument()
+    expect(within(sheet).getByText('Collect BDT 1,520.00')).toBeInTheDocument()
+    expect(within(sheet).getByText('PT 123')).toBeInTheDocument()
+    const charges = within(sheet).getByLabelText('Charges of WEB-000001')
+    expect(charges).toHaveTextContent('Delivery60.00')
+    expect(charges).toHaveTextContent('Cash on delivery fee10.00')
+    expect(charges).toHaveTextContent('Amount payableBDT 1,520.00')
+    expect(within(sheet).getByText('Call first')).toBeInTheDocument()
+  })
+
+  it('stamps a cancelled order\'s Mushak-6.3 invoice', async () => {
+    mockApi({ 'GET /auth/me': ok(orderViewer()), 'GET /web-orders/print': ok(mushakDoc(true)) })
+    renderRoutes(routes, '/web-orders/print?ids=wo-1&kind=invoice')
+
+    const sheet = await screen.findByRole('article', { name: 'Invoice WEB-000001' })
+    expect(within(sheet).getByTestId('cancelled-stamp')).toHaveTextContent('Cancelled')
+  })
+
   it('needs web order access', async () => {
     mockApi({ 'GET /auth/me': ok(makeCurrentUser({ permissions: ['branches.view'] })) })
     renderRoutes(routes, '/web-orders/print?ids=wo-1&kind=invoice')

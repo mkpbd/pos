@@ -87,7 +87,7 @@ export function CustomerDialog({ open, onOpenChange, customer, groups, canSetTer
           <FormField label="Name" error={errors.name?.message}><Input autoFocus {...form.register('name')} /></FormField>
           <FormField label="Phone" error={errors.phone?.message}><Input type="tel" {...form.register('phone')} /></FormField>
           <FormField label="E-mail" error={errors.email?.message}><Input type="email" {...form.register('email')} /></FormField>
-          <FormField label="Tax / BIN number" error={errors.tax_number?.message}><Input {...form.register('tax_number')} /></FormField>
+          <FormField label="BIN" error={errors.tax_number?.message}><Input {...form.register('tax_number')} /></FormField>
           <FormField label="Address" error={errors.address?.message} className="sm:col-span-2"><Textarea rows={2} {...form.register('address')} /></FormField>
 
           {canSetTerms && (

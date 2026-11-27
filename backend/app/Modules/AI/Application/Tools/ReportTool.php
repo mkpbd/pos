@@ -184,6 +184,7 @@ final class ReportTool implements AiTool
 
         return match ($param->type) {
             'date' => ['type' => 'string', 'format' => 'date', 'description' => $label.', YYYY-MM-DD in the organization\'s timezone'],
+            'month' => ['type' => 'string', 'description' => $label.', YYYY-MM (a calendar month in the organization\'s timezone)'],
             'entity' => ['type' => 'string', 'description' => $label.': the id of a '.$param->entity.' from the list in the instructions (omit for all accessible '.$param->entity.'s)'],
             'enum' => ['type' => 'string', 'enum' => $param->optionValues(), 'description' => $label.': '.implode('; ', array_map(fn (array $o) => $o['value'].' = '.$o['label'], $param->options ?? []))],
             'integer' => array_filter(['type' => 'integer', 'minimum' => $param->min, 'maximum' => $param->max, 'description' => $label], fn ($v) => $v !== null),

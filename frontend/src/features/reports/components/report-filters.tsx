@@ -100,6 +100,14 @@ function ParamControl({ param, values, onChange }: { param: ReportParam; values:
       </div>
     )
   }
+  if (param.type === 'month') {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={id}>{param.label}</Label>
+        <Input id={id} type="month" className="w-44" value={value} onChange={(e) => e.target.value && set(e.target.value)} />
+      </div>
+    )
+  }
   if (param.type === 'boolean') {
     return (
       <div className="flex h-9 items-center gap-2">

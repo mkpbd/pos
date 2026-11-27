@@ -57,6 +57,7 @@ class ToolsAreReadOnlyTest extends TestCase
             foreach ($schema['required'] as $param) {
                 $args[$param] = match ($param) {
                     'date_from', 'date_to' => '2026-11-07',
+                    'month' => '2026-11',
                     'store_id' => $store,
                     default => $this->fail("No test value for {$name}.{$param}"),
                 };

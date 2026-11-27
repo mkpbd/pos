@@ -44,6 +44,20 @@ class EloquentCustomerDirectory implements CustomerDirectory
             ->all();
     }
 
+    public function invoiceDetails(string $organizationId, string $customerId): ?array
+    {
+        $customer = Customer::query()->withoutGlobalScope('organization')->withTrashed()
+            ->where('organization_id', $organizationId)
+            ->find($customerId, ['id', 'name', 'tax_number', 'address']);
+        $blankToNull = fn (?string $value) => ($value = trim((string) $value)) === '' ? null : $value;
+
+        return $customer === null ? null : [
+            'name' => $customer->name,
+            'tax_number' => $blankToNull($customer->tax_number),
+            'address' => $blankToNull($customer->address),
+        ];
+    }
+
     public function openingBalances(string $organizationId, array $customerIds): array
     {
         if ($customerIds === []) {

@@ -64,11 +64,12 @@ export function ReportTable({ title, columns, rows, totals, sort, onSort, timeZo
         </TableHeader>
         <TableBody>
           {rows.map((row, r) => (
-            <TableRow key={rowKey(row, r)}>
+            // VAT1: summary rows (`kind: 'total'`, e.g. the Mushak-9.1 totals and net VAT) are emphasised.
+            <TableRow key={rowKey(row, r)} data-kind={row.kind === 'total' ? 'total' : undefined}>
               {columns.map((c, i) => (
                 <TableCell
                   key={c.key}
-                  className={cn(isNumericType(c.type) && 'text-right font-mono tabular-nums', i === 0 && 'sticky left-0 z-[1] bg-card font-medium', isNegative(row[c.key]) && 'text-destructive')}
+                  className={cn(isNumericType(c.type) && 'text-right font-mono tabular-nums', i === 0 && 'sticky left-0 z-[1] bg-card font-medium', isNegative(row[c.key]) && 'text-destructive', row.kind === 'total' && 'font-bold')}
                 >
                   <CellContent row={row} column={c} timeZone={timeZone} can={can} />
                 </TableCell>

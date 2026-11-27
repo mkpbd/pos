@@ -149,4 +149,22 @@ describe('Supplier page — Catalog tab', () => {
     expect(screen.getByText('15 days')).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: 'Catalog' })).not.toBeInTheDocument()
   })
+
+  it('VAT1: shows the BIN on the details and labels the form field "BIN"', async () => {
+    const user = userEvent.setup()
+    mockApi({
+      'GET /auth/me': ok(catalogManager()),
+      'GET /suppliers': paged([{ ...supplier, tax_number: '000777666-0303' }]),
+      'GET /suppliers/sup-2': ok({ ...supplier, tax_number: '000777666-0303' }),
+    })
+    renderRoutes(routes, '/suppliers/sup-2')
+
+    const label = await screen.findByText('BIN')
+    expect(label.nextElementSibling).toHaveTextContent('000777666-0303')
+
+    renderRoutes(routes, '/suppliers')
+    await user.click(await screen.findByRole('button', { name: 'Edit Fresh Drinks Ltd' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText('BIN')).toHaveValue('000777666-0303')
+  })
 })

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, toPaginated, type Paginated } from '@/lib/api/client'
+import type { Mushak } from '@/features/sales/api'
 import type { OrderReturnSummary } from '@/features/web-returns/api'
 import type { OrderRisk, PhoneReport } from '@/features/web-orders/risk'
 import type { OrderEdit } from '@/features/web-orders/order-entry-api'
@@ -426,6 +427,8 @@ export type PrintOrder = {
   shipping_discount?: string
   cod_fee?: string
   total?: string
+  /** VAT1, invoice only: the Mushak-6.3 block when the shop has a BIN (`cancelled` for cancelled orders). */
+  mushak?: Mushak | null
 }
 
 export type PrintDocument = { kind: PrintKind; organization: PrintOrganization | null; orders: PrintOrder[] }

@@ -71,6 +71,7 @@ final class ParameterResolver
 
         return [...$presence, ...match ($param->type) {
             'date' => ['date_format:Y-m-d'],
+            'month' => ['date_format:Y-m'],
             'entity' => ['uuid'],
             'enum' => [Rule::in($param->optionValues())],
             'integer' => ['integer', 'min:'.($param->min ?? PHP_INT_MIN), 'max:'.($param->max ?? PHP_INT_MAX)],

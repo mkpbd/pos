@@ -40,14 +40,17 @@ export function tookCash(sale: Sale): boolean {
 /**
  * The sale receipt for the printer: the same content as the on-screen thermal receipt (header,
  * lines, exchange, totals, payments, change, store credit left, footer) and, when the sale has a
- * public link, its QR code.
+ * public link, its QR code. VAT1: with a Mushak-6.3 block, the "Mushak-6.3" heading, the buyer's
+ * BIN and each line's VAT.
  */
 export function saleDocument(sale: Sale, link: string | null = null): PrintBlock[] {
   const blocks: PrintBlock[] = []
   const c = sale.currency
   const r = sale.receipt
   const branch = r.branch
-  const bin = r.tax_number?.trim() || null
+  // VAT1: the Mushak-6.3 block, present only when the shop has a BIN.
+  const mushak = sale.mushak ?? null
+  const bin = r.tax_number?.trim() || mushak?.seller.bin || null
   const taxInvoice = (r.is_tax_invoice ?? true) && !!bin
   const payments = sale.payments.filter((p) => p.kind === 'payment')
   const discount = addDecimal(sale.item_discount_total, sale.invoice_discount_total, 2)
@@ -60,10 +63,12 @@ export function saleDocument(sale: Sale, link: string | null = null): PrintBlock
   if (r.header) blocks.push(text(r.header, { align: 'center' }))
   blocks.push(rule)
 
+  if (mushak) blocks.push(text('Mushak-6.3', { bold: true }))
   blocks.push(text(`${taxInvoice ? 'Tax invoice' : 'Receipt'}: ${sale.number}`, { bold: true }))
   blocks.push(text(formatDate(sale.sold_at, r.timezone)))
   if (sale.cashier?.name) blocks.push(text(`Cashier: ${sale.cashier.name}`))
   blocks.push(text(`Customer: ${sale.customer ? `${sale.customer.name}${sale.customer.phone ? ` (${sale.customer.phone})` : ''}` : 'Walk-in'}`))
+  if (mushak?.buyer.bin) blocks.push(text(`Buyer BIN: ${mushak.buyer.bin}`))
   if (sale.status === 'cancelled') blocks.push(text('*** CANCELLED ***', { align: 'center', bold: true }))
   blocks.push(rule)
 
@@ -79,6 +84,7 @@ export function saleDocument(sale: Sale, link: string | null = null): PrintBlock
     blocks.push(row(`  ${trimDecimal(l.quantity)}${l.unit_code ? ` ${l.unit_code}` : ''} x ${formatMoney(l.unit_price)}${changed ? ` (was ${formatMoney(l.list_price)})` : ''}`, formatMoney(l.line_total)))
     if (changed && l.price_approved_by?.name) blocks.push(text(`  price approved by ${l.price_approved_by.name}`))
     if (!isZeroDecimal(l.discount_amount)) blocks.push(row(`  ${l.promotion ? l.promotion.name : 'discount'}`, `-${formatMoney(l.discount_amount)}`))
+    if (mushak) blocks.push(row(`  ${mushak.prices_include_tax ? 'incl. VAT' : 'VAT'} ${trimDecimal(l.tax_rate)}%`, formatMoney(l.tax_amount)))
     if (l.serials.length > 0) blocks.push(text(`  S/N: ${l.serials.join(', ')}`))
     for (const b of l.batches) blocks.push(text(`  Batch ${b.batch_number ?? ''}${b.expires_on ? ` exp ${b.expires_on}` : ''}`))
   }

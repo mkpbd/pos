@@ -91,6 +91,16 @@ describe('report params', () => {
     expect(paramsProblem(monthly, { date_from: '2024-01-01', date_to: '2026-11-07', group_by: 'month' })).toBeNull()
     expect(paramsProblem(monthly, { date_from: '2024-01-01', date_to: '2026-11-07', group_by: 'day' })).toMatch(/or group by month/)
   })
+
+  it('VAT1: takes a month (YYYY-MM), this month by default in the organization calendar', () => {
+    const def = normalizeDefinition({ key: 'mushak_9_1', title: 'Monthly VAT summary', group: 'finance', params: [{ name: 'month', label: 'Month', type: 'month', required: true }, { name: 'branch_id', label: 'Branch', type: 'entity', entity: 'branch' }], columns: ['line'] })
+    expect(def.params.map((p) => [p.key, p.type])).toEqual([['month', 'month'], ['branch_id', 'id']])
+    expect(defaultValues(def, TZ, new Date('2026-10-31T19:00:00Z'))).toEqual({ month: '2026-11' })
+    expect(runQuery(def, new URLSearchParams('month=2026-09'), TZ, NOW)).toMatchObject({ month: '2026-09' })
+    expect(paramsProblem(def, {})).toBe('Choose month.')
+    // Declared as a plain string, the key still makes it a month.
+    expect(normalizeDefinition({ key: 'x', params: { month: { type: 'string', required: true } } }).params[0]).toMatchObject({ key: 'month', type: 'month', label: 'Month' })
+  })
 })
 
 describe('report formatting', () => {

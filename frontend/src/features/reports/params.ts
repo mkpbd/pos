@@ -95,8 +95,8 @@ export const isRanged = (def: ReportDefinition) => hasParam(def, 'date_from') &&
 
 /**
  * Values a report starts with when the URL does not say otherwise: the definition's defaults,
- * this month for a date range (this year when grouped by month), today for single dates, and
- * the first option of a required choice.
+ * this month for a date range (this year when grouped by month), today for single dates, this
+ * month for a month, and the first option of a required choice.
  */
 export function defaultValues(def: ReportDefinition, timeZone: string | undefined, now = new Date()): Record<string, string> {
   const values: Record<string, string> = {}
@@ -110,6 +110,7 @@ export function defaultValues(def: ReportDefinition, timeZone: string | undefine
   for (const p of def.params) {
     if (values[p.key] !== undefined || !p.required) continue
     if (p.type === 'date') values[p.key] = todayIn(timeZone, now)
+    else if (p.type === 'month') values[p.key] = todayIn(timeZone, now).slice(0, 7)
     else if (p.type === 'enum' && p.options[0]) values[p.key] = p.options[0].value
   }
   return values

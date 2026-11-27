@@ -48,7 +48,7 @@ returns with approval, register X/Z reports, expenses, basic loyalty, per-branch
 | Gap | Pri | Notes |
 |---|---|---|
 | **Offline selling** (internet / power cuts stop sales) | P0/P1 | Out of scope by ADR for v1 — needs a product decision |
-| **Bangladesh VAT / Mushak** (6.3 invoice, 6.1/6.2 registers, 9.1 return, supplementary duty stacked on VAT) | P1 | Only a generic tax report exists |
+| **Bangladesh VAT / Mushak** (6.3 invoice, 6.1/6.2 registers, 9.1 return, supplementary duty stacked on VAT) | **Done (VAT1)** except supplementary duty (shown as 0) | Only a generic tax report exists |
 | **Promotions & coupons at the till** | **Done (POS1a)** | promotion channels online / till, coupons at the till, one discount per level |
 | **Price override / open-price items with manager approval at the till** | **Done (POS1a)** | change price with permission or a manager's PIN; open-price products |
 | **Exchanges**, **store credit / gift cards / vouchers**, customer advances | **Done (POS1b, exchanges POS1c)** | store credit with advances, gift cards, vouchers, credit notes |

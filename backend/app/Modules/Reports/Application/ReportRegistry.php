@@ -40,6 +40,10 @@ final class ReportRegistry
         Reports\LossPreventionReport::class,
         Reports\ReturnsReport::class,
         Reports\DeadStockReport::class,
+        // VAT1: Bangladesh VAT registers (Mushak-6.2 / 6.1) and the monthly summary for Mushak-9.1.
+        Reports\SalesRegisterReport::class,
+        Reports\PurchaseRegisterReport::class,
+        Reports\VatSummaryReport::class,
     ];
 
     /** @var array<string, Report>|null */

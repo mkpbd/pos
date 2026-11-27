@@ -26,13 +26,13 @@ class ReportAccessTest extends TestCase
         $keys = fn (User $user) => array_column($this->actingAsUser($user)->getJson('/api/v1/reports')->assertOk()->json('data'), 'key');
 
         $all = $keys($admin);
-        $this->assertCount(21, $all);
+        $this->assertCount(24, $all);
         $this->assertSame(['sales_daily', 'sales_monthly', 'sales_by_product', 'sales_by_category', 'sales_by_branch', 'sales_by_cashier', 'profit_and_loss',
             'inventory_valuation', 'stock_movements', 'low_stock', 'expiry', 'purchases', 'sales_by_customer', 'customer_dues', 'supplier_dues', 'payment_collections', 'tax', 'expenses',
-            'loss_prevention', 'returns', 'dead_stock'], $all);
+            'loss_prevention', 'returns', 'dead_stock', 'mushak_6_2', 'mushak_6_1', 'mushak_9_1'], $all);
         $this->assertSame($all, $keys($this->createUserWithRole($org, SystemRole::Accountant, [$branch->id])));
         $this->assertSame($all, $keys($this->createUserWithRole($org, SystemRole::BranchManager, [$branch->id])));
-        $this->assertSame(array_values(array_diff($all, ['profit_and_loss', 'tax'])), $keys($this->createUserWithRole($org, SystemRole::InventoryManager, [$branch->id])));
+        $this->assertSame(array_values(array_diff($all, ['profit_and_loss', 'tax', 'mushak_6_2', 'mushak_6_1', 'mushak_9_1'])), $keys($this->createUserWithRole($org, SystemRole::InventoryManager, [$branch->id])));
 
         $cashier = $this->createUserWithRole($org, SystemRole::Cashier, [$branch->id]);
         $this->actingAsUser($cashier)->getJson('/api/v1/reports')->assertForbidden();
@@ -220,7 +220,7 @@ class ReportAccessTest extends TestCase
         $this->actingAsUser($admin);
 
         foreach (array_keys(app(ReportRegistry::class)->all()) as $key) {
-            $this->report($key, ['date_from' => '2026-11-01', 'date_to' => '2026-11-07'])->assertOk()->assertJsonPath('meta.report', $key);
+            $this->report($key, ['date_from' => '2026-11-01', 'date_to' => '2026-11-07', 'month' => '2026-11'])->assertOk()->assertJsonPath('meta.report', $key);
         }
     }
 }

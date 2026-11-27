@@ -21,6 +21,20 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### VAT1 — Mushak 6.3 VAT invoice, 6.1 / 6.2 registers, monthly 9.1 summary
+
+From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). Owner's choices: supplementary duty later (shown as 0, no price change); 6.3 on till sales and web orders. No new packages, no migrations.
+
+#### Added
+- **Mushak-6.3 tax invoice**: once the shop's BIN is set, the A4 receipt and the web order invoice print the 6.3 layout (seller / buyer with BIN, line table with SD and VAT, signature) — payments, exchange and footer still print; thermal receipts and receipt printers add "Mushak-6.3", the buyer's BIN and VAT per line. Customers' and suppliers' tax number is now labelled **BIN**.
+- Reports **Sales register (Mushak-6.2)**, **Purchase register (Mushak-6.1)** and **Monthly VAT summary (for Mushak-9.1)** — output and input VAT by rate, net payable or credit carried forward, equal to the registers.
+
+#### Tests
+- Backend 2143 (2142 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3366; typecheck, lint, build clean. Browser tests not run (owner's instruction).
+
+#### Upgrade
+- Nothing to run; fill in the organization's BIN to turn the 6.3 invoice on.
+
 ### BD2b — Cart reminders, shipped / delivered e-mails, newsletter campaigns
 
 Second part of BD2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §5 (P1). No new packages. From this phase on browser (Playwright) tests are not run, on the owner's instruction.

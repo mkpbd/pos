@@ -8,8 +8,10 @@ use App\Modules\Inventory\Application\Contracts\BatchDirectory;
 use App\Modules\Sales\Application\Contracts\StoreCredit;
 use App\Modules\Sales\Application\Services\SalesContext;
 use App\Modules\Sales\Application\Services\StoredValueTenders;
+use App\Modules\Sales\Domain\MushakInvoice;
 use App\Modules\Sales\Domain\PaymentMethod;
 use App\Modules\Sales\Domain\ReturnStatus;
+use App\Modules\Sales\Domain\TaxMode;
 use App\Modules\Sales\Infrastructure\Models\Sale;
 use App\Modules\Sales\Infrastructure\Models\SaleLine;
 use App\Modules\Sales\Infrastructure\Models\SaleLineSerial;
@@ -202,7 +204,44 @@ class SalePresenter
                 // POS1b: what the customer has left in store credit (now).
                 'customer_store_credit_balance' => $sale->customer_id === null ? null : $this->storeCredit->balance($sale->customer_id),
             ],
+            // VAT1: the Mushak-6.3 tax invoice (null without the seller's BIN).
+            'mushak' => $taxNumber === null ? null : $this->mushak($sale, $lines, $organization, $taxNumber, $branch['address'] ?? null),
         ];
+    }
+
+    /**
+     * VAT1: the Mushak-6.3 block — the buyer is the sale's customer (name, BIN, address) or a
+     * walk-in customer; issued when sold, in the organization's timezone.
+     *
+     * @param  Collection<int, SaleLine>  $lines
+     * @param  array<string, mixed>  $organization
+     * @return array<string, mixed>
+     */
+    private function mushak(Sale $sale, Collection $lines, array $organization, string $taxNumber, ?string $branchAddress): array
+    {
+        $customer = $sale->customer_id === null ? null : $this->customers->invoiceDetails($this->context->organizationId(), $sale->customer_id);
+
+        return MushakInvoice::of(
+            ['name' => filled($organization['legal_name'] ?? null) ? $organization['legal_name'] : (string) ($organization['name'] ?? ''), 'bin' => $taxNumber,
+                'address' => filled($organization['address'] ?? null) ? $organization['address'] : $branchAddress],
+            $customer === null
+                ? ['name' => 'Walk-in customer', 'bin' => null, 'address' => null]
+                : ['name' => $customer['name'], 'bin' => $customer['tax_number'], 'address' => $customer['address']],
+            $sale->number,
+            $sale->sold_at->copy()->setTimezone($organization['timezone'] ?? config('app.timezone'))->toIso8601String(),
+            $lines->map(fn (SaleLine $l) => [
+                'description' => MushakInvoice::description($l->product_name, $l->variant_name),
+                'unit' => $l->unit_code,
+                'quantity' => $l->quantity,
+                'unit_price' => $l->unit_price,
+                'net_amount' => $l->net_amount,
+                'tax_rate' => $l->tax_rate,
+                'tax_amount' => $l->tax_amount,
+                'line_total' => $l->line_total,
+            ])->values()->all(),
+            $sale->tax_mode === TaxMode::Inclusive,
+            $sale->cancelled_at !== null,
+        );
     }
 
     /**

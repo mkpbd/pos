@@ -180,6 +180,7 @@ export function CustomerAccountSheet({ customer, onOpenChange }: { customer: Cus
       <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>{customer?.name}</SheetTitle>
+          {customer?.tax_number && <p className="text-sm" data-testid="customer-bin">BIN {customer.tax_number}</p>}
           <SheetDescription>Sales and returns move the balance; payments reduce it. Points are earned on purchases.</SheetDescription>
         </SheetHeader>
         {customer && (

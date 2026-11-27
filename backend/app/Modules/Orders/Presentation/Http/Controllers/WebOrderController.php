@@ -165,7 +165,8 @@ class WebOrderController
      * variant_name, sku, quantity}]`; an invoice adds per line `unit_price, line_subtotal,
      * discount_amount, tax_rate, tax_amount, line_total` and `currency, prices_include_tax,
      * subtotal, discount_total, tax_total, shipping_total, shipping_discount, cod_fee,
-     * promotions, coupon_code, total, paid_total, balance_due`. An id that is not an order of
+     * promotions, coupon_code, total, paid_total, balance_due`, and VAT1 `mushak` (the
+     * Mushak-6.3 block, null without the organization's BIN). An id that is not an order of
      * this organization: 404.
      */
     public function print(Request $request, OrganizationDirectory $organizations, TenantContext $tenant, StorefrontConfig $storefront, MediaLibrary $media): JsonResponse
@@ -196,7 +197,7 @@ class WebOrderController
                 'tax_number' => $organization['tax_number'] ?? null,
                 'logo_url' => $logo,
             ],
-            'orders' => array_map(fn (string $id) => $this->presenter->printable($orders[$id], $data['kind']), $ids),
+            'orders' => array_map(fn (string $id) => $this->presenter->printable($orders[$id], $data['kind'], $organization), $ids),
         ]);
     }
 
