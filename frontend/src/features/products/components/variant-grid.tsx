@@ -1,7 +1,7 @@
-import { useId, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
+import { Fragment, useId, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { Controller, useFieldArray, useForm, useWatch, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { BellIcon, Loader2Icon, PackagePlusIcon, PlusIcon, Trash2Icon, Undo2Icon, WandSparklesIcon } from 'lucide-react'
+import { BellIcon, ChevronDownIcon, ChevronRightIcon, Loader2Icon, PackagePlusIcon, PlusIcon, Trash2Icon, Undo2Icon, WandSparklesIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { StoreSelect } from '@/components/common/store-select'
 import { Badge } from '@/components/ui/badge'
@@ -17,8 +17,10 @@ import { useBranchesQuery } from '@/features/branches/api'
 import { useAttributesQuery } from '@/features/catalog/api'
 import { useSaveVariantGridMutation, type Product } from '@/features/products/api'
 import { StockAdjustDialog, type StockTarget } from '@/features/products/components/stock-adjust-dialog'
+import { VariantExtras } from '@/features/products/components/variant-extras'
 import {
   applyBulk,
+  barcodeErrorKey,
   bulkValueError,
   combinationCount,
   defaultSkuBase,
@@ -30,6 +32,7 @@ import {
   rowLabel,
   rowsWithValue,
   skuFor,
+  splitBarcodes,
   splitValues,
   toGridInput,
   toGridValues,
@@ -113,6 +116,8 @@ export function VariantGrid({ product }: Props) {
   const [stockStore, setStockStore] = useState('')
   const [adjusting, setAdjusting] = useState<StockTarget[] | null>(null)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  /** ST2c: rows whose packs, quantity breaks and branch prices are open. */
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const tableRef = useRef<HTMLDivElement>(null)
 
   // Structural values (ids, combinations) only change through generate/reset, which re-render via `variants.fields`.
@@ -126,6 +131,7 @@ export function VariantGrid({ product }: Props) {
   const columnKeys = columns.map((c) => c.key)
 
   const branches = useBranchesQuery({ page: 1, per_page: 100, is_active: true })
+  const branchList = useMemo(() => (branches.data?.items ?? []).map((b) => ({ id: b.id, name: b.name })), [branches.data])
   const stockStores = useMemo(() => {
     const present = new Set(product.variants.flatMap((v) => v.stock?.by_store.map((s) => s.store_id) ?? []))
     return (branches.data?.items ?? []).flatMap((b) => b.stores.filter((s) => present.has(s.id)).map((s) => ({ id: s.id, label: `${s.name} (${b.name})` })))
@@ -246,7 +252,9 @@ export function VariantGrid({ product }: Props) {
       onError: (error) => {
         if (error instanceof ApiError && error.code === 'VALIDATION_FAILED' && Object.keys(error.fieldErrors).length) {
           for (const [key, messages] of Object.entries(error.fieldErrors)) {
-            let path = gridErrorKey(key, map).replace(/\.barcodes\.\d+$/, '.barcodes')
+            const mapped = gridErrorKey(key, map)
+            const row = values.variants[Number(/^variants\.(\d+)\./.exec(mapped)?.[1])]
+            let path = barcodeErrorKey(mapped, row ? splitBarcodes(row.barcodes).length : 0)
             if (path === 'variants') path = 'variants.root'
             form.setError(path as Path<VariantGridValues>, { type: 'server', message: messages[0] })
           }
@@ -444,6 +452,7 @@ export function VariantGrid({ product }: Props) {
                   {columns.map((c) => <th key={c.key} scope="col" className="px-1 py-2 font-medium whitespace-nowrap">{c.key === 'opening_stock' ? 'Opening stock' : c.short}</th>)}
                   {showStock && <th scope="col" className="px-2 py-2 text-right font-medium whitespace-nowrap">In stock</th>}
                   <th scope="col" className="px-2 py-2 font-medium">Active</th>
+                  <th scope="col" className="px-2 py-2 font-medium whitespace-nowrap">Packs & prices</th>
                 </tr>
               </thead>
               <tbody>
@@ -455,8 +464,16 @@ export function VariantGrid({ product }: Props) {
                   const stock = row.id ? stockOf(product, row.id, stockStore) : null
                   const low = stock !== null && saved && compareDecimal(saved.reorder_level, '0') > 0 && !stock.startsWith('-') && compareDecimal(stock, trimDecimal(saved.reorder_level)) <= 0
                   const comboError = rowError(i, 'option_values')
+                  const extrasError = ['packs', 'price_tiers', 'branch_prices'].some((k) => (errors.variants?.[i] as Record<string, unknown> | undefined)?.[k] !== undefined)
+                  const open = expanded.has(i) || extrasError
+                  const extras = [
+                    row.packs.length && `${row.packs.length} ${row.packs.length === 1 ? 'pack' : 'packs'}`,
+                    row.price_tiers.length && `${row.price_tiers.length} qty ${row.price_tiers.length === 1 ? 'break' : 'breaks'}`,
+                    row.branch_prices.length && `${row.branch_prices.length} branch ${row.branch_prices.length === 1 ? 'price' : 'prices'}`,
+                  ].filter(Boolean).join(' · ')
                   return (
-                    <tr key={field.id} className={cn('border-t align-top', selected.has(i) && 'bg-primary/5')}>
+                    <Fragment key={field.id}>
+                    <tr className={cn('border-t align-top', selected.has(i) && 'bg-primary/5')}>
                       <td className="sticky left-0 z-[1] w-9 min-w-9 bg-card px-2 py-2">
                         <Checkbox aria-label={`Select ${label}`} checked={selected.has(i)} onCheckedChange={(on) => toggle(i, on === true)} />
                       </td>
@@ -518,7 +535,33 @@ export function VariantGrid({ product }: Props) {
                           <Switch aria-label={`Active: ${label}`} checked={f.value} onCheckedChange={f.onChange} />
                         )} />
                       </td>
+                      <td className="px-2 py-1.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          aria-expanded={open}
+                          aria-label={`Packs and prices of ${label}`}
+                          onClick={() => setExpanded((s) => {
+                            const next = new Set(s)
+                            if (next.has(i)) next.delete(i)
+                            else next.add(i)
+                            return next
+                          })}
+                        >
+                          {open ? <ChevronDownIcon data-icon="inline-start" /> : <ChevronRightIcon data-icon="inline-start" />}
+                          <span className={cn('whitespace-nowrap', !extras && 'text-muted-foreground')}>{extras || 'Add'}</span>
+                        </Button>
+                      </td>
                     </tr>
+                    {open && (
+                      <tr className={cn(selected.has(i) && 'bg-primary/5')}>
+                        <td colSpan={columns.length + (showStock ? 5 : 4)} className="border-t border-dashed bg-muted/20">
+                          <VariantExtras index={i} label={label} control={form.control} register={form.register} errors={errors} branches={branchList} />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>

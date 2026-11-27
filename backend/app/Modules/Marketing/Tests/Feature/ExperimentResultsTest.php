@@ -35,6 +35,8 @@ class ExperimentResultsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // 23:45 UTC is already the next day in Dhaka: everything (the test, its orders) must count in the local day.
+        $this->travelTo(CarbonImmutable::now('UTC')->setTime(23, 45));
         Notification::fake();
         $this->buildShop();
         $this->page = $this->pageWithTest();
@@ -114,8 +116,6 @@ class ExperimentResultsTest extends TestCase
 
     public function test_versions_are_counted_from_beacons_carts_and_orders(): void
     {
-        // 23:45 UTC is already tomorrow in Dhaka: orders must still fall in the local day.
-        $this->travelTo(CarbonImmutable::now('UTC')->setTime(23, 45));
         $this->collect();
         $rows = DB::table('builder_experiment_stats')->orderBy('arm')->get()
             ->map(fn ($r) => [$r->experiment_id, $r->arm, $r->device, (int) $r->views, (int) $r->visitors, (int) $r->section_views, (int) $r->clicks, (int) $r->clicked_views, (int) $r->add_to_carts])->all();

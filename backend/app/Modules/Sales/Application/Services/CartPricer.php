@@ -13,9 +13,10 @@ use App\Modules\Shared\Domain\ValueObjects\Money;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Prices a cart exactly as checkout will: current selling prices and tax rates from the
- * catalog (the client sends a price only for open-price products and approved price
- * changes — POS1a, TillPriceRules), discount rules, till promotions, then the SaleCalculator.
+ * Prices a cart exactly as checkout will: current list prices (ST2c: branch, wholesale and
+ * quantity-break prices) and tax rates from the catalog (the client sends a price only for
+ * open-price products and approved price changes — POS1a, TillPriceRules), discount rules,
+ * till promotions, then the SaleCalculator.
  * Used for the live POS preview and inside checkout, so both always agree.
  *
  * Discount rules (critical rule #4 — validated on the server):
@@ -79,6 +80,9 @@ class CartPricer
         $customer = filled($cart['customer_id'] ?? null) ? $this->context->requireActiveCustomer($cart['customer_id']) : null;
         $lines = array_values($cart['lines']);
         $variants = $this->products->variants($organizationId, array_column($lines, 'variant_id'));
+        // ST2c: list prices — the store's branch prices and the customer's price level.
+        $branchPrices = $this->products->branchPrices($organizationId, $store['branch_id'], array_keys($variants));
+        $wholesale = ($customer['price_level'] ?? null) === 'wholesale';
 
         $errors = [];
         $calcLines = [];
@@ -98,8 +102,8 @@ class CartPricer
                 $errors["lines.{$i}.quantity"] = ["{$variant['product_name']} is sold in whole units ({$variant['unit_code']})."];
             }
 
-            // POS1a: catalog, open (typed) or overridden price.
-            $prices[$i] = $rules->linePrice($i, $line, $variant);
+            // POS1a: list (ST2c: catalog / branch, wholesale, tier), open (typed) or overridden price.
+            $prices[$i] = $rules->linePrice($i, $line, $variant, $quantity, $branchPrices[$variant['variant_id']] ?? null, $wholesale);
 
             $discount = Discount::fromArray($line['discount'] ?? null);
             $manual[$i] = '0';

@@ -23,7 +23,17 @@ export type ProductVariant = {
   stock?: VariantStock | null
   /** Shoppers waiting for a back-in-stock e-mail (P1a §3). */
   back_in_stock_open?: number
+  /** ST2c: pack barcodes (units > 1); their codes are also in `barcodes`. */
+  packs?: VariantPack[]
+  /** ST2c: quantity breaks, lowest first. */
+  price_tiers?: PriceTier[]
+  /** ST2c: selling price per branch. */
+  branch_prices?: BranchPrice[]
 }
+
+export type VariantPack = { barcode: string; units: string; pack_name: string | null }
+export type PriceTier = { min_quantity: string; price: string }
+export type BranchPrice = { branch_id: string; price: string }
 
 export type VariantStock = { total: string; by_store: { store_id: string; branch_id: string; quantity: string }[] }
 
@@ -85,8 +95,11 @@ export type ProductInput = {
     selling_price: string
     wholesale_price: string | null
     reorder_level: string
-    barcodes: string[]
+    /** ST2c: a pack barcode is sent as `{barcode, units, pack_name}`. */
+    barcodes: (string | VariantPack)[]
     is_active: boolean
+    price_tiers?: PriceTier[]
+    branch_prices?: BranchPrice[]
   }[]
 }
 
@@ -97,7 +110,11 @@ export type VariantGridInput = {
     id?: string
     option_values: Record<string, string>
     sku: string | null
-    barcodes: string[]
+    /** ST2c: a pack barcode is sent as `{barcode, units, pack_name}`. */
+    barcodes: (string | VariantPack)[]
+    /** ST2c: replace the variant's quantity breaks and branch prices. */
+    price_tiers: PriceTier[]
+    branch_prices: BranchPrice[]
     purchase_price: string
     selling_price: string
     wholesale_price: string | null

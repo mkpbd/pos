@@ -59,4 +59,35 @@ describe('CustomersPage', () => {
 
     await waitFor(() => expect(posted).toMatchObject({ name: 'Rahman Traders', credit_limit: '50000', customer_group_id: null, is_active: true }))
   })
+
+  it('ST2c: sets a group to wholesale prices and lists its price level', async () => {
+    const user = userEvent.setup()
+    let patched: Record<string, unknown> | undefined
+    mockApi({
+      'GET /auth/me': ok(catalogManager()),
+      'GET /customers': emptyPage,
+      'GET /customer-groups': ok([
+        { id: 'g-1', name: 'Traders', description: null, discount_percent: '0.00', price_level: 'retail', customers_count: 0 },
+        { id: 'g-2', name: 'Shops', description: null, discount_percent: '2.00', price_level: 'wholesale', customers_count: 3 },
+      ]),
+      'PATCH /customer-groups/g-1': (init) => {
+        patched = JSON.parse(String(init.body))
+        return ok({ id: 'g-1', name: 'Traders', description: null, discount_percent: '0.00', price_level: 'wholesale' })
+      },
+    })
+    renderRoutes(routes, '/customers')
+
+    await user.click(await screen.findByRole('tab', { name: 'Groups' }))
+    expect(await screen.findByRole('columnheader', { name: 'Price level' })).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /Shops/ })).toHaveTextContent('Wholesale')
+    expect(screen.getByRole('row', { name: /Traders/ })).toHaveTextContent('Retail')
+
+    await user.click(screen.getByRole('button', { name: 'Edit Traders' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('combobox', { name: 'Price level' }))
+    await user.click(await screen.findByRole('option', { name: 'Wholesale' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(patched).toEqual({ name: 'Traders', description: null, discount_percent: '0.00', price_level: 'wholesale' }))
+  })
 })

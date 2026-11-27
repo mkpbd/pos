@@ -143,6 +143,9 @@ class SaveVariantGrid
                 'reorder_level' => $row['reorder_level'] ?? '0',
                 'barcodes' => $row['barcodes'] ?? [],
                 'is_active' => $row['is_active'] ?? true,
+                // ST2c: left out = kept.
+                'price_tiers' => $row['price_tiers'] ?? null,
+                'branch_prices' => $row['branch_prices'] ?? null,
             ];
         }
 

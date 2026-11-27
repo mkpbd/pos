@@ -70,6 +70,8 @@ class PosController
      * Scan or type a code
      *
      * Exact barcode, then SKU. `404` when unknown, `PRODUCT_NOT_SELLABLE` when archived/inactive.
+     * ST2c: `scan_units` is how many base units the scanned code adds ('1.000', or a pack's units)
+     * and `pack_name` the pack's name (null for a unit barcode or SKU).
      */
     public function lookup(Request $request, FindSellableVariant $find): JsonResponse
     {
@@ -77,8 +79,12 @@ class PosController
         $store = $this->storeAccess->require($this->user($request), $data['store_id']);
         $variantId = $find($data['code'])->id;
         $variant = $this->products->variants($this->tenant->requireOrganization(), [$variantId])[$variantId];
+        $pack = collect($variant['packs'])->firstWhere('barcode', trim($data['code']));
 
-        return ApiResponse::success($this->item($variant + ['image_url' => null], $this->stock->onHand($store['id'], [$variantId])));
+        return ApiResponse::success($this->item($variant + ['image_url' => null], $this->stock->onHand($store['id'], [$variantId])) + [
+            'scan_units' => $pack['units'] ?? '1.000',
+            'pack_name' => $pack['pack_name'] ?? null,
+        ]);
     }
 
     /**
@@ -136,6 +142,8 @@ class PosController
             'sellable' => $v['sellable'],
             // POS1a: the cashier types the price.
             'open_price' => (bool) ($v['open_price'] ?? false),
+            // ST2c: pack barcodes (carton, box) the till can scan or pick.
+            'packs' => $v['packs'] ?? [],
         ];
     }
 

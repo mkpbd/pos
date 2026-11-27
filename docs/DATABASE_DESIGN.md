@@ -471,6 +471,13 @@ Unique `ai_insights_scope_unique (organization_id, scope_key, period, period_dat
 
 `json` columns (not `jsonb`): the payloads are written and read whole, never queried. No other module's table changes. The CHECKs and the migration ran with the full suite on PostgreSQL 18 (2026-11-11).
 
+### Pack barcodes and till price rules ST2c (implemented)
+
+- `product_barcodes.units numeric(18,3)` (default 1, > 0) and `pack_name` — a pack barcode (carton = 24 units); stock and money stay per unit.
+- `product_price_tiers` (organization, variant, `min_quantity` > 1, `price` ≥ 0; unique variant + min quantity).
+- `product_branch_prices` (organization, variant, branch, `price` ≥ 0; unique variant + branch).
+- `customer_groups.price_level` CHECK `retail|wholesale`; `sale_lines.price_source` CHECK adds `wholesale`, `tier`.
+
 ### Transfer receiving, requests and documents ST2b (implemented)
 
 - `stock_transfers.status` adds `requested` and `rejected`; `requested_by` / `requested_at`, `rejected_by` / `rejected_at`, `rejection_reason`, `loss_total numeric(18,2)`; `dispatched_at` nullable (a request is not dispatched yet).

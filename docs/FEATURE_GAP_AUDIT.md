@@ -76,8 +76,8 @@ batches, weighted-average cost, transfers, adjustments, CSV/Excel/PDF export of 
 | **Barcode generation & label printing** (product / shelf labels) | **Done (ST1)** | in-store EAN-13, *Print labels* (A4 + thermal + shelf) |
 | **Stocktake / cycle count** (count session, counted vs system, variance report, freeze) | **Done (ST1)** | stocktake sessions with scan, blind mode, variance, snapshot posting |
 | **Supplier payments outside the cash register & payments ledger; no supplier refunds** | **Done (ST1)** | ledger + drawer, refunds, voids |
-| Box / carton units usable in buying & selling (unit conversions exist but no line uses them) | P1 | — |
-| Wholesale price used anywhere (stored, never used); price lists, quantity tiers, branch prices | P1 | — |
+| Box / carton units usable in buying & selling (unit conversions exist but no line uses them) | **Done (ST2c)** — pack barcodes; no per-pack price | — |
+| Wholesale price used anywhere (stored, never used); price lists, quantity tiers, branch prices | **Done (ST2c)** at the till — wholesale groups, quantity breaks, branch prices; no named price lists; online store unchanged | — |
 | Purchase discounts and **bonus / free quantity** (10+1) on PO / receipt | **Done (ST2a)** — line discount %; whole-bill discount not yet | Standard in BD FMCG & pharma — costs come out wrong without it |
 | Short-close a partly received PO; purchase return without a goods receipt (expired stock back to the rep) | **Done (ST2a)** | — |
 | Transfer received short / damaged, transfer request & approval, challan print | **Done (ST2b)** | Receive takes no quantities |

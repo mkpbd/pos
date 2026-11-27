@@ -3097,3 +3097,80 @@ test('ST2b: a Bazar Fresh warehouse requests stock, the shop floor dispatches it
     await context.close()
   }
 })
+
+test('ST2c: Bazar Fresh prices a product by branch, wholesale customer and quantity break; scanning its carton at the till adds 24 at the carton-quantity price', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile-chromium', 'The till runs on desktop')
+  test.setTimeout(240_000)
+  const base = origin('grocery.shop.localhost')
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } })
+  const page = await context.newPage()
+  await signIn(page, base, 'owner@grocery.test')
+  const call = async (method: string, url: string, body?: unknown) => {
+    const token = decodeURIComponent((await context.cookies(base)).find((c) => c.name === 'XSRF-TOKEN')?.value ?? '')
+    return page.evaluate(
+      async ({ method, url, body, token }) => {
+        const res = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-XSRF-TOKEN': token, 'Idempotency-Key': crypto.randomUUID() }, body: body === undefined ? undefined : JSON.stringify(body) })
+        return { status: res.status, body: (await res.json().catch(() => null)) as { data: any; error?: any } }
+      },
+      { method, url, body, token },
+    )
+  }
+
+  const stamp = String(Date.now()).slice(-8)
+  try {
+    const branch = ((await call('GET', '/api/v1/branches')).body.data as { id: string }[])[0]!
+    const store = ((await call('GET', `/api/v1/branches/${branch.id}/stores`)).body.data as { id: string; is_active: boolean }[]).find((s) => s.is_active)!
+    const current = await call('GET', '/api/v1/register-sessions/current')
+    if (!(current.status === 200 && current.body.data)) {
+      const register = await call('POST', '/api/v1/cash-registers', { branch_id: branch.id, code: `P${stamp.slice(-6)}`, name: `Pricing ${stamp}` })
+      expect(register.status).toBe(201)
+      expect((await call('POST', `/api/v1/cash-registers/${register.body.data.id}/sessions`, { opening_float: '1000' })).status).toBeLessThan(300)
+    }
+    const units = (await call('GET', '/api/v1/units')).body.data as { id: string; code: string }[]
+    const unit = units.find((u) => u.code === 'pcs') ?? units[0]!
+    // 30 normally, 32 at this branch, 25 for wholesale customers, 27 each from 24; a carton barcode of 24.
+    const carton = `CTN${stamp}`
+    const product = await call('POST', '/api/v1/products', {
+      name: `Mum Water 500ml ${stamp}`, type: 'standard', unit_id: unit.id, track_stock: true,
+      variants: [{ sku: `MUM-${stamp}`, purchase_price: '20', selling_price: '30', wholesale_price: '25', barcodes: [{ barcode: carton, units: 24, pack_name: 'Carton' }],
+        price_tiers: [{ min_quantity: '24', price: '27' }], branch_prices: [{ branch_id: branch.id, price: '32' }] }],
+    })
+    expect(product.status).toBe(201)
+    const variantId = product.body.data.variants[0].id as string
+    expect((await call('POST', '/api/v1/inventory/adjustments', { store_id: store.id, reason: 'opening', lines: [{ variant_id: variantId, quantity: '100', unit_cost: '20' }] })).status).toBe(201)
+    const group = await call('POST', '/api/v1/customer-groups', { name: `Wholesale ${stamp}`, price_level: 'wholesale' })
+    expect(group.status).toBe(201)
+    const trader = await call('POST', '/api/v1/customers', { name: `Rahman Traders ${stamp}`, phone: `018${stamp}`, customer_group_id: group.body.data.id })
+    expect(trader.status).toBe(201)
+
+    const price = async (quantity: string, customerId: string | null = null) =>
+      (await call('POST', '/api/v1/pos/price', { store_id: store.id, customer_id: customerId, lines: [{ variant_id: variantId, quantity }] })).body.data.lines[0] as { unit_price: string; price_source: string }
+    expect(await price('1')).toMatchObject({ unit_price: '32.00', price_source: 'catalog' })
+    expect(await price('24')).toMatchObject({ unit_price: '27.00', price_source: 'tier' })
+    expect(await price('1', trader.body.data.id)).toMatchObject({ unit_price: '25.00', price_source: 'wholesale' })
+
+    // At the till: one scan of the carton is 24 bottles at 27.
+    await page.goto(`${base}/admin/pos`)
+    await expect(page.getByRole('heading', { name: 'POS terminal' })).toBeAttached({ timeout: 20_000 })
+    // The till is ready once its product grid shows (the store is chosen); a scan before that is ignored.
+    await expect(page.getByRole('button', { name: new RegExp(`^Mum Water 500ml ${stamp}`) })).toBeVisible({ timeout: 20_000 })
+    const scan = page.getByLabel('Scan barcode or search products')
+    await scan.fill(carton)
+    await scan.press('Enter')
+    const cart = page.getByRole('complementary', { name: 'Current sale' })
+    await expect(cart.getByText('Qty price')).toBeVisible({ timeout: 15_000 })
+    await expect(cart.getByTestId('cart-total')).toContainText('648.00')
+    await cart.getByRole('button', { name: /^Pay/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'Payment' })
+    await dialog.getByRole('button', { name: 'Complete sale' }).click()
+    const done = page.getByRole('dialog', { name: /^Sale \S+ completed$/ })
+    await expect(done).toBeVisible({ timeout: 20_000 })
+    const number = (await done.innerText()).match(/Sale (\S+) completed/)![1]!
+    const sale = (await call('GET', `/api/v1/sales?search=${number}`)).body.data.find((s: { number: string }) => s.number === number) as { id: string }
+    const detail = (await call('GET', `/api/v1/sales/${sale.id}`)).body.data
+    expect(detail.lines[0]).toMatchObject({ quantity: '24.000', unit_price: '27.00' })
+    expect(detail.total).toBe('648.00')
+  } finally {
+    await context.close()
+  }
+})

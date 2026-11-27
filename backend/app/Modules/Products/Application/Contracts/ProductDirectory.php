@@ -8,7 +8,9 @@ namespace App\Modules\Products\Application\Contracts;
  * @phpstan-type VariantInfo array{
  *   variant_id: string, product_id: string, product_name: string, variant_name: ?string, sku: string,
  *   track_stock: bool, track_batches: bool, track_serials: bool, allow_decimal: bool, unit_code: ?string,
- *   tax_rate: ?string, purchase_price: string, selling_price: string, reorder_level: string,
+ *   tax_rate: ?string, purchase_price: string, selling_price: string, wholesale_price: ?string,
+ *   price_tiers: list<array{min_quantity: string, price: string}>,
+ *   packs: list<array{barcode: string, units: string, pack_name: ?string}>, reorder_level: string,
  *   max_discount_percent: ?string, category_id: ?string, brand_id: ?string, open_price: bool, sellable: bool
  * }
  */
@@ -58,6 +60,15 @@ interface ProductDirectory
     public function sellablePage(string $organizationId, array $filters, int $page, int $perPage): array;
 
     /**
+     * ST2c: the variants' selling prices at one branch, keyed by variant id (variants without a
+     * branch price are left out — they sell at `selling_price`).
+     *
+     * @param  list<string>  $variantIds
+     * @return array<string, string>
+     */
+    public function branchPrices(string $organizationId, string $branchId, array $variantIds): array;
+
+    /**
      * P2b: product photos of the organization by id (unknown and other organizations' ids left
      * out), keyed by id: the product, the same-origin URL (`/storage/…`) and the file's type.
      *
@@ -74,7 +85,7 @@ interface ProductDirectory
 
     /**
      * ST1: one barcode per variant (the first one added), keyed by variant id; variants
-     * without a barcode are left out.
+     * without a barcode are left out. ST2c: unit barcodes only (pack barcodes are skipped).
      *
      * @param  list<string>  $variantIds
      * @return array<string, string>

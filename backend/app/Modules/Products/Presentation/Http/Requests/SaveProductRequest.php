@@ -5,6 +5,7 @@ namespace App\Modules\Products\Presentation\Http\Requests;
 use App\Modules\Products\Domain\Barcode;
 use App\Modules\Products\Domain\ProductDefinitionRules;
 use App\Modules\Products\Domain\ProductType;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -49,9 +50,37 @@ class SaveProductRequest extends FormRequest
             'variants.*.selling_price' => $money,
             'variants.*.wholesale_price' => ['nullable', 'decimal:0,2', 'min:0', 'max:9999999999999999'],
             'variants.*.reorder_level' => ['nullable', 'decimal:0,3', 'min:0', 'max:999999999999999'],
-            'variants.*.barcodes' => ['array', 'max:10'],
-            'variants.*.barcodes.*' => ['string', 'max:'.Barcode::MAX_LENGTH],
             'variants.*.is_active' => ['boolean'],
+            ...self::packAndPriceRules(),
+        ];
+    }
+
+    /**
+     * Barcodes (ST2c: a code, or `{barcode, units, pack_name}` for a pack), quantity breaks and
+     * branch prices of each variant — shared with the variant grid. Lists left out are kept.
+     *
+     * @return array<string, mixed>
+     */
+    public static function packAndPriceRules(): array
+    {
+        $money = ['required', 'decimal:0,2', 'min:0', 'max:9999999999999999'];
+
+        return [
+            'variants.*.barcodes' => ['array', 'max:10'],
+            'variants.*.barcodes.*' => [function (string $attribute, mixed $value, Closure $fail) {
+                $code = is_array($value) ? ($value['barcode'] ?? null) : $value;
+                if (! is_string($code) || $code === '' || mb_strlen($code) > Barcode::MAX_LENGTH) {
+                    $fail('Enter a barcode of at most '.Barcode::MAX_LENGTH.' characters.');
+                }
+            }],
+            'variants.*.barcodes.*.units' => ['sometimes', 'decimal:0,3', 'min:1', 'max:999999'],
+            'variants.*.barcodes.*.pack_name' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'variants.*.price_tiers' => ['sometimes', 'nullable', 'array', 'max:20'],
+            'variants.*.price_tiers.*.min_quantity' => ['required', 'decimal:0,3', 'gt:1', 'max:999999999999999'],
+            'variants.*.price_tiers.*.price' => $money,
+            'variants.*.branch_prices' => ['sometimes', 'nullable', 'array', 'max:200'],
+            'variants.*.branch_prices.*.branch_id' => ['required', 'uuid'],
+            'variants.*.branch_prices.*.price' => $money,
         ];
     }
 }

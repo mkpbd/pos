@@ -13,9 +13,12 @@ use Illuminate\Support\Facades\Gate;
  * cart: it remembers the discount approval it checked).
  *
  * - Open-price products: the cashier types the price (`unit_price` required → PRICE_REQUIRED).
- * - Any other product is charged its catalog price unless `unit_price` differs from it: that
+ * - Any other product is charged its list price unless `unit_price` differs from it: that
  *   needs `sales.price_override`, or a manager's till approval for that variant
  *   (`price_approval_id`), else APPROVAL_REQUIRED (`action: price_override`, `line`).
+ * - ST2c, the list price: the store's branch price, else the selling price (`catalog`); for a
+ *   wholesale customer the wholesale price when set (`wholesale`); then the highest quantity
+ *   break the line reaches, when lower (`tier`). Only `catalog` lines take promotions.
  * - Manual item and invoice discounts need `sales.discount`, or a manager's till approval
  *   for discounts (`discount_approval_id`), else APPROVAL_REQUIRED (`action: discount`).
  *
@@ -25,6 +28,10 @@ use Illuminate\Support\Facades\Gate;
 class TillPriceRules
 {
     public const SOURCE_CATALOG = 'catalog';
+
+    public const SOURCE_WHOLESALE = 'wholesale';
+
+    public const SOURCE_TIER = 'tier';
 
     public const SOURCE_OVERRIDE = 'override';
 
@@ -57,11 +64,14 @@ class TillPriceRules
      *
      * @param  array<string, mixed>  $line  the cart line (`unit_price`, `price_approval_id`)
      * @param  array<string, mixed>  $variant  ProductDirectory variant
+     * @param  string  $quantity  the line quantity (quantity breaks)
+     * @param  ?string  $branchPrice  the variant's price at the store's branch, if set
+     * @param  bool  $wholesale  the cart's customer buys at wholesale prices
      * @return array{unit_price: string, list_price: ?string, source: string, approval: ?array{id: string, approver_id: string, approver_name: string}}
      *
      * @throws BusinessRuleViolation PRICE_REQUIRED, APPROVAL_REQUIRED, APPROVAL_INVALID
      */
-    public function linePrice(int $index, array $line, array $variant): array
+    public function linePrice(int $index, array $line, array $variant, string $quantity, ?string $branchPrice, bool $wholesale): array
     {
         $typed = isset($line['unit_price']) && $line['unit_price'] !== '' ? Decimal::round((string) $line['unit_price'], 2) : null;
         if ($typed !== null && Decimal::compare($typed, '0') <= 0) {
@@ -76,9 +86,9 @@ class TillPriceRules
             return ['unit_price' => $typed, 'list_price' => null, 'source' => self::SOURCE_OPEN, 'approval' => null];
         }
 
-        $catalog = Decimal::round((string) $variant['selling_price'], 2);
-        if ($typed === null || Decimal::compare($typed, $catalog) === 0) {
-            return ['unit_price' => $catalog, 'list_price' => $catalog, 'source' => self::SOURCE_CATALOG, 'approval' => null];
+        [$list, $source] = self::listPrice($variant, $quantity, $branchPrice, $wholesale);
+        if ($typed === null || Decimal::compare($typed, $list) === 0) {
+            return ['unit_price' => $list, 'list_price' => $list, 'source' => $source, 'approval' => null];
         }
 
         $approval = null;
@@ -93,7 +103,36 @@ class TillPriceRules
             $approval = $this->approvals()->check((string) $approvalId, $this->requesterId, TillApprovals::PRICE_OVERRIDE, $this->scoped(['variant_id' => $variant['variant_id']]));
         }
 
-        return ['unit_price' => $typed, 'list_price' => $catalog, 'source' => self::SOURCE_OVERRIDE, 'approval' => $approval];
+        return ['unit_price' => $typed, 'list_price' => $list, 'source' => self::SOURCE_OVERRIDE, 'approval' => $approval];
+    }
+
+    /**
+     * ST2c: the list price of a non-open-price line and its source.
+     *
+     * @param  array<string, mixed>  $variant  with `wholesale_price` and `price_tiers` ({min_quantity, price}, by min_quantity)
+     * @return array{0: string, 1: string}
+     */
+    private static function listPrice(array $variant, string $quantity, ?string $branchPrice, bool $wholesale): array
+    {
+        $price = Decimal::round($branchPrice ?? (string) $variant['selling_price'], 2);
+        $source = self::SOURCE_CATALOG;
+        if ($wholesale && ($variant['wholesale_price'] ?? null) !== null) {
+            [$price, $source] = [Decimal::round((string) $variant['wholesale_price'], 2), self::SOURCE_WHOLESALE];
+        }
+
+        $reached = null;
+        $reachedMin = '0';
+        foreach ($variant['price_tiers'] ?? [] as $tier) {
+            $min = (string) $tier['min_quantity'];
+            if (Decimal::compare($quantity, $min) >= 0 && Decimal::compare($min, $reachedMin) > 0) {
+                [$reached, $reachedMin] = [Decimal::round((string) $tier['price'], 2), $min];
+            }
+        }
+        if ($reached !== null && Decimal::compare($reached, $price) < 0) {
+            [$price, $source] = [$reached, self::SOURCE_TIER];
+        }
+
+        return [$price, $source];
     }
 
     /**

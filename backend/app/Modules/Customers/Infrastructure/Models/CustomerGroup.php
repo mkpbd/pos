@@ -14,14 +14,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property ?string $description
  * @property string $discount_percent
+ * @property string $price_level ST2c: retail|wholesale — wholesale members pay the wholesale price at the till
  */
-#[Fillable(['organization_id', 'name', 'description', 'discount_percent'])]
+#[Fillable(['organization_id', 'name', 'description', 'discount_percent', 'price_level'])]
 class CustomerGroup extends Model
 {
     use BelongsToOrganization, HasUuids, TracksAuthor;
 
     protected $attributes = [
         'discount_percent' => '0',
+        'price_level' => 'retail',
     ];
 
     protected function casts(): array

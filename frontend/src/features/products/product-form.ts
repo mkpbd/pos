@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { decimalPattern, MONEY_PATTERN } from '@/lib/money'
 import type { Product, ProductInput } from '@/features/products/api'
+import { barcodesInput } from '@/features/products/variant-grid'
 
 const money = z.string().trim().regex(MONEY_PATTERN, 'Amount with up to 2 decimals.')
 const optionalMoney = z.union([money, z.literal('')])
@@ -118,7 +119,10 @@ export function toProductInput(form: ProductFormValues, current?: Product): Prod
         selling_price: v.selling_price,
         wholesale_price: v.wholesale_price,
         reorder_level: v.reorder_level,
-        barcodes: v.barcodes,
+        // ST2c: packs, quantity breaks and branch prices go back unchanged (edited in the grid).
+        barcodes: barcodesInput(v),
+        ...(v.price_tiers ? { price_tiers: v.price_tiers } : {}),
+        ...(v.branch_prices ? { branch_prices: v.branch_prices } : {}),
         is_active: v.is_active,
       })),
     }

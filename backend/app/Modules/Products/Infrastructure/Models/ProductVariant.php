@@ -69,4 +69,24 @@ class ProductVariant extends Model
     {
         return $this->hasMany(ProductBarcode::class, 'variant_id');
     }
+
+    /**
+     * ST2c: quantity breaks, lowest first.
+     *
+     * @return HasMany<ProductPriceTier, $this>
+     */
+    public function priceTiers(): HasMany
+    {
+        return $this->hasMany(ProductPriceTier::class, 'variant_id')->orderBy('min_quantity');
+    }
+
+    /**
+     * ST2c: per-branch selling prices.
+     *
+     * @return HasMany<ProductBranchPrice, $this>
+     */
+    public function branchPrices(): HasMany
+    {
+        return $this->hasMany(ProductBranchPrice::class, 'variant_id');
+    }
 }

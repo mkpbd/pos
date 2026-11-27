@@ -3,8 +3,12 @@
 namespace App\Modules\Products\Presentation\Http\Resources;
 
 use App\Modules\Products\Infrastructure\Models\Product;
+use App\Modules\Products\Infrastructure\Models\ProductBarcode;
+use App\Modules\Products\Infrastructure\Models\ProductBranchPrice;
 use App\Modules\Products\Infrastructure\Models\ProductImage;
+use App\Modules\Products\Infrastructure\Models\ProductPriceTier;
 use App\Modules\Products\Infrastructure\Models\ProductVariant;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -84,8 +88,18 @@ class ProductResource extends JsonResource
             'wholesale_price' => $variant->wholesale_price,
             'reorder_level' => $variant->reorder_level,
             'barcodes' => $variant->barcodes->pluck('barcode')->values(),
+            // ST2c: the pack barcodes among them (units > 1), e.g. a carton of 24.
+            'packs' => $variant->barcodes->filter(fn (ProductBarcode $b) => Decimal::compare($b->units, '1') > 0)
+                ->map(fn (ProductBarcode $b) => ['barcode' => $b->barcode, 'units' => $b->units, 'pack_name' => $b->pack_name])->values(),
             'is_active' => $variant->is_active,
         ];
+        // ST2c: quantity breaks and branch prices (product page / save responses).
+        if ($variant->relationLoaded('priceTiers')) {
+            $data['price_tiers'] = $variant->priceTiers->map(fn (ProductPriceTier $t) => ['min_quantity' => $t->min_quantity, 'price' => $t->price])->values();
+        }
+        if ($variant->relationLoaded('branchPrices')) {
+            $data['branch_prices'] = $variant->branchPrices->map(fn (ProductBranchPrice $b) => ['branch_id' => $b->branch_id, 'price' => $b->price])->values();
+        }
 
         if (! $this->withCost) {
             unset($data['purchase_price']);

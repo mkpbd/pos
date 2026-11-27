@@ -3,10 +3,13 @@ import { PlusIcon, Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { emptyLine, type LinesForm } from '@/components/common/line-values'
+import { emptyLine, packQuantity, packUnitCost, type LinesForm } from '@/components/common/line-values'
 import { VariantPicker } from '@/components/common/variant-picker'
 import { useBatchesQuery, useStockOnHandQuery } from '@/features/inventory/api'
 import { isZeroDecimal, subtractDecimal, trimDecimal } from '@/lib/money'
+
+/** The "Pack" select's single-units choice. */
+const UNITS = '__units__'
 
 type Config = {
   /** Show a unit cost column. */
@@ -137,6 +140,18 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
               const batchMode = config.count ? 'out' : config.batch === 'signed' ? (negative ? 'out' : 'in') : config.batch
               const countLine: CountLine = { variantId: variant?.id, storeId: config.storeId, batchId: line?.batch_id, trackBatches: !!variant?.track_batches }
               const err = (f: string) => lineError(errs, i, f)
+              // ST2c: entering in packs (carton of 24) fills quantity = packs × units and unit cost = pack cost ÷ units.
+              const packs = config.cost && !config.count && !config.signed ? (variant?.packs ?? []) : []
+              const pack = packs.find((p) => p.barcode === line?.pack)
+              const packUnits = pack?.units ?? ''
+              const fillFromPacks = (next: { units?: string; count?: string; cost?: string }) => {
+                const units = next.units ?? packUnits
+                if (!units) return
+                const quantity = packQuantity(next.count ?? line?.pack_count ?? '', units)
+                if (quantity !== null) set(`lines.${i}.quantity`, quantity, { shouldValidate: !!err('quantity') })
+                const cost = config.cost ? packUnitCost(next.cost ?? line?.pack_cost ?? '', units) : null
+                if (cost !== null) set(`lines.${i}.unit_cost`, cost, { shouldValidate: !!err('unit_cost') })
+              }
 
               return (
                 <tr key={field.id} className="align-top">
@@ -158,6 +173,7 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                             aria-label={`Product of line ${i + 1}`}
                             onChange={(option) => {
                               f.onChange(option)
+                              set(`lines.${i}.pack`, '')
                               // Pre-fill the last known cost; the user can overwrite it.
                               if (config.cost && !config.costPlaceholder && !line?.unit_cost && option.purchase_price) set(`lines.${i}.unit_cost`, option.purchase_price)
                             }}
@@ -180,6 +196,32 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                       {variant?.unit_code}{line?.max_quantity && ` · max ${line.max_quantity}`}
                     </p>
                     {err('quantity') && <p className="text-xs text-destructive">{err('quantity')}</p>}
+                    {packs.length > 0 && (
+                      <div className="mt-1 flex flex-col gap-1">
+                        <Select
+                          value={pack?.barcode ?? UNITS}
+                          onValueChange={(v) => {
+                            set(`lines.${i}.pack`, v === UNITS ? '' : v)
+                            fillFromPacks({ units: packs.find((p) => p.barcode === v)?.units ?? '' })
+                          }}
+                        >
+                          <SelectTrigger size="sm" className="w-full" aria-label={`Pack of line ${i + 1}`}><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={UNITS}>Units</SelectItem>
+                            {packs.map((p) => <SelectItem key={p.barcode} value={p.barcode}>{p.pack_name ?? 'Pack'} ({trimDecimal(p.units)})</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        {packUnits && (
+                          <Input
+                            aria-label={`Packs of line ${i + 1}`}
+                            className="h-8"
+                            inputMode="decimal"
+                            placeholder="Packs"
+                            {...reg(`lines.${i}.pack_count`, { onChange: (e: { target: { value: string } }) => fillFromPacks({ count: e.target.value }) })}
+                          />
+                        )}
+                      </div>
+                    )}
                   </td>
                   {config.count && <DifferenceCell line={countLine} counted={(line?.quantity ?? '').trim()} />}
                   {config.discount && (
@@ -192,6 +234,15 @@ export function LinesEditor<T extends LinesForm>({ control, register, setValue, 
                     <td className="pr-2">
                       <Input aria-label={`Unit cost of line ${i + 1}`} inputMode="decimal" placeholder={config.costPlaceholder ?? '0.00'} aria-invalid={!!err('unit_cost') || undefined} disabled={config.signed && !config.count && negative} {...reg(`lines.${i}.unit_cost`)} />
                       {err('unit_cost') && <p className="mt-1 text-xs text-destructive">{err('unit_cost')}</p>}
+                      {packUnits && (
+                        <Input
+                          aria-label={`Pack cost of line ${i + 1}`}
+                          className="mt-1 h-8"
+                          inputMode="decimal"
+                          placeholder="Per pack"
+                          {...reg(`lines.${i}.pack_cost`, { onChange: (e: { target: { value: string } }) => fillFromPacks({ cost: e.target.value }) })}
+                        />
+                      )}
                     </td>
                   )}
                   {config.discount && (

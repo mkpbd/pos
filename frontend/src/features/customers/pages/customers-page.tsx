@@ -35,18 +35,19 @@ import { decimalPattern, formatMoney, isZeroDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 
 const ALL = 'all'
-type GroupValues = { name: string; description: string | null; discount_percent: string }
+/** price_level: null = Retail (the dialog's "none" choice). */
+type GroupValues = { name: string; description: string | null; discount_percent: string; price_level: 'wholesale' | null }
 
 function GroupsTab({ canManage }: { canManage: boolean }) {
   const groups = useCustomerGroupsQuery()
   const save = useSaveCustomerGroupMutation()
   const remove = useDeleteCustomerGroupMutation()
   const [editing, setEditing] = useState<CustomerGroup | null | undefined>(undefined)
-  const [defaults, setDefaults] = useState<GroupValues>({ name: '', description: null, discount_percent: '0' })
+  const [defaults, setDefaults] = useState<GroupValues>({ name: '', description: null, discount_percent: '0', price_level: null })
   const [deleting, setDeleting] = useState<CustomerGroup | null>(null)
 
   const open = (g: CustomerGroup | null) => {
-    setDefaults({ name: g?.name ?? '', description: g?.description ?? null, discount_percent: g?.discount_percent ?? '0' })
+    setDefaults({ name: g?.name ?? '', description: g?.description ?? null, discount_percent: g?.discount_percent ?? '0', price_level: g?.price_level === 'wholesale' ? 'wholesale' : null })
     setEditing(g)
   }
 
@@ -66,6 +67,7 @@ function GroupsTab({ canManage }: { canManage: boolean }) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Discount</TableHead>
+                <TableHead>Price level</TableHead>
                 <TableHead>Customers</TableHead>
                 {canManage && <TableHead className="w-24"><span className="sr-only">Actions</span></TableHead>}
               </TableRow>
@@ -75,6 +77,7 @@ function GroupsTab({ canManage }: { canManage: boolean }) {
                 <TableRow key={g.id}>
                   <TableCell className="font-medium">{g.name}<div className="text-xs text-muted-foreground">{g.description}</div></TableCell>
                   <TableCell>{formatMoney(g.discount_percent)} %</TableCell>
+                  <TableCell>{g.price_level === 'wholesale' ? <Badge variant="info">Wholesale</Badge> : 'Retail'}</TableCell>
                   <TableCell>{g.customers_count ?? 0}</TableCell>
                   {canManage && (
                     <TableCell className="text-right">
@@ -97,11 +100,12 @@ function GroupsTab({ canManage }: { canManage: boolean }) {
           { name: 'name', label: 'Name', type: 'text', rules: { required: 'Required.' } },
           { name: 'description', label: 'Description', type: 'text' },
           { name: 'discount_percent', label: 'Default discount (%)', type: 'text', inputMode: 'decimal', rules: { pattern: { value: decimalPattern(2), message: 'A percentage with up to 2 decimals.' } } },
+          { name: 'price_level', label: 'Price level', type: 'select', noneLabel: 'Retail', options: [{ value: 'wholesale', label: 'Wholesale' }], hint: 'Wholesale members pay the wholesale price at the till where a product has one.' },
         ]}
         defaultValues={defaults}
         submitLabel={editing ? 'Save changes' : 'Create group'}
         isPending={save.isPending}
-        onSubmit={(values) => save.mutateAsync({ id: editing?.id, input: { ...values, discount_percent: values.discount_percent || '0' } }).then((g) => toast.success(`${g.name} saved.`))}
+        onSubmit={(values) => save.mutateAsync({ id: editing?.id, input: { ...values, discount_percent: values.discount_percent || '0', price_level: values.price_level ?? 'retail' } }).then((g) => toast.success(`${g.name} saved.`))}
       />
       <ConfirmDialog
         open={deleting !== null}

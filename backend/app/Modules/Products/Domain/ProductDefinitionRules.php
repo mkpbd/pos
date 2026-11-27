@@ -3,6 +3,8 @@
 namespace App\Modules\Products\Domain;
 
 use App\Modules\Products\Application\DTOs\ProductData;
+use App\Modules\Products\Application\DTOs\VariantData;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 
 /**
  * Consistency rules of a product definition that do not need the database.
@@ -12,6 +14,7 @@ use App\Modules\Products\Application\DTOs\ProductData;
  *   values come from the option's list, and no two variants share a combination.
  * - SKUs and barcodes are unique within the product; barcodes pass Barcode::isValid().
  * - Batch and serial tracking require stock tracking.
+ * - ST2c: a pack barcode (units > 1) is named; quantity breaks and branch prices are unique per variant.
  */
 final class ProductDefinitionRules
 {
@@ -129,7 +132,40 @@ final class ProductDefinitionRules
                     $errors["variants.{$i}.barcodes.{$j}"] = "Barcode \"{$barcode}\" is used twice.";
                 }
                 $barcodes[$barcode] = true;
+
+                $pack = $variant->packs[$barcode] ?? null;
+                if ($pack !== null && Decimal::compare($pack['units'], '1') > 0 && $pack['pack_name'] === null) {
+                    $errors["variants.{$i}.barcodes.{$j}.pack_name"] = 'Name the pack, e.g. Carton or Box.';
+                }
             }
+
+            $errors += self::priceListViolations($i, $variant);
+        }
+
+        return $errors;
+    }
+
+    /**
+     * ST2c: one quantity break per minimum quantity and one price per branch.
+     *
+     * @return array<string, string>
+     */
+    private static function priceListViolations(int $i, VariantData $variant): array
+    {
+        $errors = [];
+        $seen = [];
+        foreach ($variant->priceTiers ?? [] as $k => $tier) {
+            if (isset($seen[$tier['min_quantity']])) {
+                $errors["variants.{$i}.price_tiers.{$k}.min_quantity"] = 'Two quantity breaks have the same minimum quantity.';
+            }
+            $seen[$tier['min_quantity']] = true;
+        }
+        $seen = [];
+        foreach ($variant->branchPrices ?? [] as $k => $price) {
+            if (isset($seen[$price['branch_id']])) {
+                $errors["variants.{$i}.branch_prices.{$k}.branch_id"] = 'This branch already has a price.';
+            }
+            $seen[$price['branch_id']] = true;
         }
 
         return $errors;

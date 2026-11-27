@@ -42,7 +42,7 @@ class CustomerGroupController
     {
         DB::transaction(function () use ($customerGroup) {
             ReferentialIntegrity::deleteOrFail($customerGroup, 'customer group');
-            $this->audit->record('customer_group.deleted', $customerGroup, old: $customerGroup->only(['name', 'discount_percent']));
+            $this->audit->record('customer_group.deleted', $customerGroup, old: $customerGroup->only(['name', 'discount_percent', 'price_level']));
         });
 
         return ApiResponse::noContent();
@@ -55,10 +55,10 @@ class CustomerGroupController
     {
         return DB::transaction(function () use ($group, $attributes) {
             $creating = ! $group->exists;
-            $before = $creating ? [] : $group->only(['name', 'description', 'discount_percent']);
+            $before = $creating ? [] : $group->only(['name', 'description', 'discount_percent', 'price_level']);
             $group->fill($attributes)->save();
 
-            [$old, $new] = Changes::between($before, $group->only(['name', 'description', 'discount_percent']));
+            [$old, $new] = Changes::between($before, $group->only(['name', 'description', 'discount_percent', 'price_level']));
             if ($creating || $new !== []) {
                 $this->audit->record($creating ? 'customer_group.created' : 'customer_group.updated', $group, $old, $new);
             }

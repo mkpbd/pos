@@ -28,6 +28,12 @@ export type PosItem = {
   sellable: boolean
   /** POS1a: the price is typed at the till when the item is added (absent before POS1a). */
   open_price?: boolean
+  /** ST2c: units the scanned barcode stands for ('1.000' for a unit barcode; lookup only). */
+  scan_units?: string
+  /** ST2c: the scanned pack's name, e.g. "Carton" (lookup only). */
+  pack_name?: string | null
+  /** ST2c: the variant's pack barcodes (units > 1). */
+  packs?: { barcode: string; units: string; pack_name: string | null }[]
 }
 
 export type CartLineInput = {
@@ -86,8 +92,11 @@ export type PricedLine = {
   promotion?: { name: string; amount: string } | null
 }
 
-/** POS1a: `catalog` list price, `override` changed at the till, `open` typed at the till. */
-export type PriceSource = 'catalog' | 'override' | 'open'
+/**
+ * POS1a: `catalog` list price (or the branch price), `override` changed at the till, `open` typed at the till.
+ * ST2c: `wholesale` a wholesale customer's price, `tier` a quantity break.
+ */
+export type PriceSource = 'catalog' | 'wholesale' | 'tier' | 'override' | 'open'
 
 /** POS1a: the coupon's state in the preview. */
 export type PricedCoupon = { code: string; status: 'applied' | 'invalid' | 'not_applicable'; reason?: string | null; message: string | null }

@@ -24,6 +24,8 @@ class EloquentCustomerDirectory implements CustomerDirectory
             'credit_limit' => $customer->credit_limit,
             'opening_balance' => $customer->opening_balance,
             'group_discount_percent' => $customer->group?->discount_percent ?? '0.00',
+            // ST2c: wholesale group members pay the variant's wholesale price at the till.
+            'price_level' => $customer->group?->price_level ?? 'retail',
         ];
     }
 

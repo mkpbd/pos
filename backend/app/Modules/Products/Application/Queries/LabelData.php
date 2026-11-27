@@ -61,7 +61,8 @@ final class LabelData
                 continue; // another organization's id, or a variant deleted since
             }
             $unit = $units[$variant->product->unit_id] ?? null;
-            $barcode = $variant->barcodes->sortBy(['created_at', 'id'])->first()?->barcode;
+            // ST2c: a unit label never carries a pack (carton) barcode.
+            $barcode = $variant->barcodes->where('units', '1.000')->sortBy(['created_at', 'id'])->first()?->barcode;
             $labels[] = [
                 'variant_id' => $variant->id,
                 'product_name' => $variant->product->name,

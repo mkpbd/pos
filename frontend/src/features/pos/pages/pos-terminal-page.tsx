@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { useAuth, useCan } from '@/features/auth/use-auth'
 import { useBranchesQuery } from '@/features/branches/api'
 import { useLoyaltyBalancesQuery, useLoyaltySettingsQuery } from '@/features/loyalty/api'
-import { lookupCode, useCheckoutMutation, useHoldMutation, usePriceQuery, type HeldSale, type PaymentMethod, type PosItem, type PricedCart } from '@/features/pos/api'
+import { itemLabel, lookupCode, useCheckoutMutation, useHoldMutation, usePriceQuery, type HeldSale, type PaymentMethod, type PosItem, type PricedCart } from '@/features/pos/api'
 import { cartOps, toCartInput, usePosCart, type LineInfo } from '@/features/pos/cart-store'
 import { CartLines, CartTotals } from '@/features/pos/components/cart-panel'
 import { CouponField } from '@/features/pos/components/coupon-field'
@@ -39,7 +39,7 @@ import type { Sale } from '@/features/sales/api'
 import { TillMenu } from '@/features/pos/components/till-menu'
 import { TillReceiptDialog } from '@/features/pos/components/till-receipt-dialog'
 import { api, ApiError } from '@/lib/api/client'
-import { formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
+import { compareDecimal, formatMoney, isZeroDecimal, trimDecimal } from '@/lib/money'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useSessionStore } from '@/stores/session-store'
 
@@ -129,7 +129,8 @@ function PosTerminal() {
   const creditBalance = credit.data && cart.customer ? credit.data.balance : null
   const storeCredit: StoreCreditTender | null = priced?.customer && canSeeCredit ? { balance: priced.customer.id === cart.customer?.id ? creditBalance : null } : null
 
-  const addItem = (item: PosItem) => {
+  /** `quantity`: units added, e.g. a scanned carton's 24 (ST2c). */
+  const addItem = (item: PosItem, quantity = '1') => {
     if (!item.sellable) {
       toast.error(`${item.product_name} is not for sale.`)
       return
@@ -138,7 +139,7 @@ function PosTerminal() {
       setPriceTarget({ kind: 'add', item })
       return
     }
-    apply((c) => cartOps.addItem(c, item))
+    apply((c) => cartOps.addItem(c, item, null, quantity))
   }
 
   const scan = async (e: React.FormEvent) => {
@@ -147,7 +148,11 @@ function PosTerminal() {
     if (!code || !cart.storeId) return
     setScanning(true)
     try {
-      addItem(await lookupCode(cart.storeId, code))
+      const item = await lookupCode(cart.storeId, code)
+      // ST2c: a pack barcode (carton, box) adds all its units; the server prices them.
+      const units = item.scan_units && compareDecimal(item.scan_units, '1') > 0 ? trimDecimal(item.scan_units) : null
+      addItem(item, units ?? '1')
+      if (units && item.sellable && !item.open_price) toast.success(`${item.pack_name ?? 'Pack'} (${units}) · ${itemLabel(item)}`)
       setSearch('')
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {

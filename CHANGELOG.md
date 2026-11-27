@@ -21,6 +21,22 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### ST2c — Carton barcodes, wholesale price, quantity breaks, branch prices
+
+Third part of ST2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). Serial register and past-date valuation (ST2d) follow. No new packages.
+
+#### Added
+- **Pack barcodes** on products (e.g. *Carton* = 24): one scan at the till adds 24, a stocktake scan counts 24; purchase orders and receipts can be entered in packs (Pack, packs, pack cost → quantity and cost per unit). Stock and prices stay per unit.
+- **Quantity breaks** (e.g. 27 each from 24), **branch prices**, and the **wholesale price** for customers in a *Wholesale* customer group (Customer groups → Price level). The till shows *Qty price* / *Wholesale* on the line; promotions apply only to normal prices. The online store keeps the normal price.
+
+#### Tests
+- Backend 2048 (2047 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3284; mocked Playwright 644 (one builder test, B20, failed once under full load and passed on rerun) (new `st2c-pricing`).
+- Full-stack (PostgreSQL, desktop) 68 (the first run failed the new ST2c test — it scanned before the till had chosen its store — and timed out once in a web-order test; the test now waits for the till, and a fresh run passed all 68) — new **ST2c** on Bazar Fresh: a product at 30 with a branch price 32, wholesale 25 and 27 each from 24; the price check gives 32 / 27 (tier) / 25 (wholesale customer); one till scan of its carton barcode adds 24 at 27 and the sale totals 648.
+- The A/B test results test now runs at 23:45 UTC from the start (it depended on the time of day).
+
+#### Upgrade
+- `php artisan migrate`.
+
 ### ST2b — Transfers received short / damaged, transfer requests, challan / PO / GRN documents
 
 Second part of ST2 from [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §4 (P1). No new packages.

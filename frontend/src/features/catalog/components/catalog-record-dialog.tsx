@@ -89,7 +89,7 @@ export function CatalogRecordDialog<T extends FieldValues>({ open, onOpenChange,
                     name={field.name}
                     render={({ field: f }) => (
                       <Select value={(f.value as string | null) ?? NONE} onValueChange={(v) => f.onChange(v === NONE ? null : v)}>
-                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-full" aria-label={field.label}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value={NONE}>{field.noneLabel ?? 'None'}</SelectItem>
                           {field.options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}

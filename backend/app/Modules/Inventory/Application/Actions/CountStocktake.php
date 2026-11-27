@@ -81,6 +81,12 @@ class CountStocktake
             ?? throw new BusinessRuleViolation('UNKNOWN_BARCODE', "No product has the barcode or SKU “{$barcode}”.", ['barcode' => $barcode]);
         $variant = $this->products->variants($organizationId, [$variantId])[$variantId];
         $summary = ['id' => $variantId, 'name' => $variant['variant_name'], 'sku' => $variant['sku'], 'product_name' => $variant['product_name']];
+        // ST2c: a carton barcode counts its units (scanning one carton of 24 adds 24).
+        foreach ($variant['packs'] ?? [] as $pack) {
+            if ($pack['barcode'] === trim($barcode)) {
+                $quantity = Decimal::mul($quantity, $pack['units'], 3);
+            }
+        }
 
         if (! $variant['track_stock']) {
             throw new BusinessRuleViolation('NOT_STOCK_TRACKED', "{$variant['product_name']} does not track stock.", ['variant' => $summary]);

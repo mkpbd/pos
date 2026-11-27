@@ -12,6 +12,8 @@ export type VariantOption = {
   /** Only present for users who may see costs. */
   purchase_price?: string
   tax_rate: string | null
+  /** ST2c: pack barcodes (carton, box) with their units, for the lines editor's "Pack" helper. */
+  packs?: { barcode: string; units: string; pack_name: string | null }[]
 }
 
 export function toVariantOptions(products: Product[]): VariantOption[] {
@@ -28,6 +30,7 @@ export function toVariantOptions(products: Product[]): VariantOption[] {
         track_batches: p.track_batches,
         purchase_price: v.purchase_price,
         tax_rate: p.tax_rate?.rate ?? null,
+        ...(v.packs?.length ? { packs: v.packs } : {}),
       })),
   )
 }

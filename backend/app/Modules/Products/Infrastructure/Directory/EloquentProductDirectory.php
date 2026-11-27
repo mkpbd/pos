@@ -96,13 +96,26 @@ class EloquentProductDirectory implements ProductDirectory
             return [];
         }
 
-        $rows = WhereInChunks::get(DB::table('product_barcodes')->where('organization_id', $organizationId), 'variant_id', $variantIds, ['variant_id', 'barcode', 'id']);
+        // ST2c: unit barcodes only — a pack (carton) barcode does not name one unit.
+        $rows = WhereInChunks::get(DB::table('product_barcodes')->where('organization_id', $organizationId)->where('units', 1), 'variant_id', $variantIds, ['variant_id', 'barcode', 'id']);
         $barcodes = [];
         foreach ($rows->sortBy('id') as $row) {
             $barcodes[(string) $row->variant_id] ??= (string) $row->barcode;
         }
 
         return $barcodes;
+    }
+
+    public function branchPrices(string $organizationId, string $branchId, array $variantIds): array
+    {
+        if ($variantIds === []) {
+            return [];
+        }
+
+        return WhereInChunks::get(DB::table('product_branch_prices')->where('organization_id', $organizationId)->where('branch_id', $branchId),
+            'variant_id', $variantIds, ['variant_id', 'price'])
+            ->mapWithKeys(fn ($row) => [(string) $row->variant_id => (string) $row->price])
+            ->all();
     }
 
     public function images(string $organizationId, array $imageIds): array
@@ -186,8 +199,18 @@ class EloquentProductDirectory implements ProductDirectory
             'units' => $products->pluck('unit_id')->filter()->all(),
             'tax_rates' => $products->pluck('tax_rate_id')->filter()->all(),
         ]);
+        // ST2c: quantity breaks of every variant in one query (no N+1 per cart line).
+        $tiers = WhereInChunks::get(DB::table('product_price_tiers')->where('organization_id', $organizationId)->orderBy('min_quantity'),
+            'variant_id', $variants->pluck('id')->all(), ['variant_id', 'min_quantity', 'price'])
+            ->groupBy('variant_id')
+            ->map(fn (Collection $rows) => $rows->map(fn ($t) => ['min_quantity' => (string) $t->min_quantity, 'price' => (string) $t->price])->values()->all());
+        // ST2c: pack barcodes (units > 1) a till or purchase line can scan or pick.
+        $packs = WhereInChunks::get(DB::table('product_barcodes')->where('organization_id', $organizationId)->where('units', '>', 1)->orderBy('units'),
+            'variant_id', $variants->pluck('id')->all(), ['variant_id', 'barcode', 'units', 'pack_name'])
+            ->groupBy('variant_id')
+            ->map(fn (Collection $rows) => $rows->map(fn ($b) => ['barcode' => (string) $b->barcode, 'units' => (string) $b->units, 'pack_name' => $b->pack_name])->values()->all());
 
-        return $variants->mapWithKeys(function (ProductVariant $v) use ($refs) {
+        return $variants->mapWithKeys(function (ProductVariant $v) use ($refs, $tiers, $packs) {
             /** @var Product $p */
             $p = $v->product;
             $unit = $refs['units'][$p->unit_id] ?? null;
@@ -206,6 +229,10 @@ class EloquentProductDirectory implements ProductDirectory
                 'tax_rate' => $p->tax_rate_id ? ($refs['tax_rates'][$p->tax_rate_id]['rate'] ?? null) : null,
                 'purchase_price' => $v->purchase_price,
                 'selling_price' => $v->selling_price,
+                // ST2c: charged to wholesale customers; quantity breaks lowest first.
+                'wholesale_price' => $v->wholesale_price,
+                'price_tiers' => $tiers->get($v->id, []),
+                'packs' => $packs->get($v->id, []),
                 'reorder_level' => $v->reorder_level,
                 'max_discount_percent' => $p->max_discount_percent,
                 'category_id' => $p->category_id,

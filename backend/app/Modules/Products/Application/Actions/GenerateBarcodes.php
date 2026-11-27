@@ -52,7 +52,8 @@ class GenerateBarcodes
             foreach ($variantIds as $id) {
                 /** @var ProductVariant $variant */
                 $variant = $variants[$id];
-                $current = $variant->barcodes->sortBy('created_at')->pluck('barcode')->values()->all();
+                // ST2c: only unit barcodes count and are replaced; pack (carton) barcodes stay.
+                $current = $variant->barcodes->where('units', '1.000')->sortBy('created_at')->pluck('barcode')->values()->all();
                 if ($current !== [] && ! $overwrite) {
                     $results[] = ['variant_id' => $id, 'barcode' => $current[0], 'generated' => false];
 
@@ -60,7 +61,7 @@ class GenerateBarcodes
                 }
 
                 if ($current !== []) {
-                    $variant->barcodes()->delete();
+                    $variant->barcodes()->whereIn('barcode', $current)->delete();
                 }
                 $barcode = $this->nextBarcode($organizationId);
                 $variant->barcodes()->create(['organization_id' => $organizationId, 'barcode' => $barcode]);

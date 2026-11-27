@@ -78,15 +78,18 @@ const newKey = () => `${Date.now().toString(36)}-${(lineCounter++).toString(36)}
 
 /** Pure cart operations (exported for tests). */
 export const cartOps = {
-  /** `unitPrice`: the price typed for an open-price item (lines at another price stay separate). */
-  addItem(cart: Cart, item: PosItem, unitPrice: string | null = null): Cart {
+  /**
+   * `unitPrice`: the price typed for an open-price item (lines at another price stay separate).
+   * `quantity`: units added, e.g. 24 for a scanned carton (ST2c).
+   */
+  addItem(cart: Cart, item: PosItem, unitPrice: string | null = null, quantity = '1'): Cart {
     // Serial-tracked goods get one line per scan so each unit's serial can be captured.
     // A changed price is never merged into: its approval belongs to that one line.
     const existing = item.track_serials
       ? undefined
       : cart.lines.find((l) => l.variant_id === item.variant_id && l.discount === null && (l.unit_price ?? null) === unitPrice && !l.price_approval_id)
     if (existing) {
-      return cartOps.setQuantity(cart, existing.key, trimDecimal(addDecimal(existing.quantity, '1')))
+      return cartOps.setQuantity(cart, existing.key, trimDecimal(addDecimal(existing.quantity, quantity)))
     }
     const line: CartLine = {
       key: newKey(),
@@ -97,7 +100,7 @@ export const cartOps = {
       allow_decimal: item.allow_decimal,
       track_serials: item.track_serials,
       price: item.price,
-      quantity: '1',
+      quantity: trimDecimal(quantity),
       discount: null,
       serials: [],
       open_price: item.open_price === true,

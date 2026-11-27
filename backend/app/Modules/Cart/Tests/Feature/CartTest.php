@@ -191,6 +191,19 @@ class CartTest extends TestCase
         $this->assertSame(['39.00', '299.00'], [$cart['tax_total'], $cart['total']]);
     }
 
+    public function test_the_store_keeps_the_selling_price_without_till_price_rules(): void
+    {
+        // ST2c: wholesale, quantity-break and branch prices are till-only.
+        $orgId = $this->tenant['organization']->id;
+        DB::table('product_variants')->where('id', $this->v['JUICE'])->update(['wholesale_price' => '90.00']);
+        DB::table('product_price_tiers')->insert(['id' => (string) Str::uuid(), 'organization_id' => $orgId, 'variant_id' => $this->v['JUICE'], 'min_quantity' => '2', 'price' => '100.00']);
+        DB::table('product_branch_prices')->insert(['id' => (string) Str::uuid(), 'organization_id' => $orgId, 'variant_id' => $this->v['JUICE'], 'branch_id' => $this->tenant['store']->branch_id, 'price' => '110.00']);
+
+        $this->add('JUICE', 5)->assertOk()
+            ->assertJsonPath('data.items.0.unit_price', '120.00')
+            ->assertJsonPath('data.subtotal', '600.00');
+    }
+
     public function test_unavailable_lines_stay_flagged_and_do_not_count(): void
     {
         $this->add('JUICE', 1)->assertOk();

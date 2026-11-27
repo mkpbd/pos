@@ -15,6 +15,7 @@ class SaveCustomerGroupRequest extends FormRequest
             'name' => [$required, 'string', 'max:100', new TenantUnique('customer_groups', 'name', $this->route('customerGroup')?->id)],
             'description' => ['sometimes', 'nullable', 'string', 'max:255'],
             'discount_percent' => ['sometimes', 'decimal:0,2', 'min:0', 'max:100'],
+            'price_level' => ['sometimes', 'string', 'in:retail,wholesale'],
         ];
     }
 }

@@ -183,7 +183,7 @@ class StocktakeTest extends TestCase
         ['admin' => $admin, 'organization' => $org] = $this->provisionTenant();
         $this->actingAsUser($admin);
         $store = $this->mainStoreId($org);
-        $soap = $this->stockedVariant($org, 'Soap', ['variants' => [['purchase_price' => '10.00', 'selling_price' => '15.00', 'barcodes' => ['4006381333931']]]]);
+        $soap = $this->stockedVariant($org, 'Soap', ['variants' => [['purchase_price' => '10.00', 'selling_price' => '15.00', 'barcodes' => ['4006381333931', ['barcode' => 'SOAPBOX12', 'units' => 12, 'pack_name' => 'Box']]]]]);
         $pills = $this->stockedVariant($org, 'Pills', ['track_batches' => true, 'variants' => [['purchase_price' => '2.00', 'selling_price' => '3.00', 'barcodes' => ['5901234123457']]]]);
         $rice = $this->stockedVariant($org, 'Rice', decimalUnit: true);
         $this->adjust($store, 'opening', ['variant_id' => $soap->id, 'quantity' => '6', 'unit_cost' => '10']);
@@ -202,6 +202,8 @@ class StocktakeTest extends TestCase
             ->assertJsonPath('data.line.system_quantity', '6.000');
         // By SKU (case-insensitive) as well.
         $this->scan($id, ['barcode' => mb_strtolower($soap->sku)])->assertOk()->assertJsonPath('data.line.counted_quantity', '5.000');
+        // ST2c: a box barcode counts its units.
+        $this->scan($id, ['barcode' => 'SOAPBOX12'])->assertOk()->assertJsonPath('data.line.counted_quantity', '17.000');
         $this->scan($id, ['barcode' => '4006381333931', 'quantity' => '1.5'])->assertStatus(422)->assertJsonStructure(['error' => ['details' => ['quantity']]]);
         $this->scan($id, ['barcode' => 'NOPE-123'])->assertStatus(422)->assertJsonPath('error.code', 'UNKNOWN_BARCODE');
 

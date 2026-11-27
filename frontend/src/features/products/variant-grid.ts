@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { decimalPattern, MONEY_PATTERN, compareDecimal } from '@/lib/money'
-import type { Product, VariantGridInput } from '@/features/products/api'
+import { decimalPattern, MONEY_PATTERN, compareDecimal, trimDecimal } from '@/lib/money'
+import type { Product, ProductVariant, VariantGridInput, VariantPack } from '@/features/products/api'
 
 /** Server limits (P1a): at most 3 options and 200 variants per product. */
 export const MAX_OPTIONS = 3
@@ -10,6 +10,21 @@ export const MAX_OPTION_VALUES = 50
 const money = z.string().trim().regex(MONEY_PATTERN, 'Amount with up to 2 decimals.')
 const optionalMoney = z.union([money, z.literal('')])
 const QUANTITY = /^\d{1,15}(\.\d{1,3})?$/
+const isMoreThanOne = (v: string) => QUANTITY.test(v.trim()) && compareDecimal(v.trim(), '1') > 0
+
+/** ST2c: a pack barcode (carton, box) standing for `units` units. */
+const packSchema = z.object({
+  barcode: z.string().trim().min(1, 'Scan or type the barcode.').max(64, 'At most 64 characters.'),
+  units: z.string().trim().refine(isMoreThanOne, 'More than 1 unit.'),
+  pack_name: z.string().trim().min(1, 'Name it, e.g. Carton.').max(40, 'At most 40 characters.'),
+})
+/** ST2c: from `min_quantity` units on, the unit price is `price`. */
+const tierSchema = z.object({
+  min_quantity: z.string().trim().refine(isMoreThanOne, 'More than 1.'),
+  price: money,
+})
+/** ST2c: the selling price at one branch. */
+const branchPriceSchema = z.object({ branch_id: z.string().min(1, 'Choose a branch.'), price: money })
 
 const rowSchema = z.object({
   id: z.string().optional(),
@@ -27,6 +42,9 @@ const rowSchema = z.object({
   opening_stock: z.union([z.string().trim().regex(QUANTITY, 'A positive quantity.'), z.literal('')]),
   /** The combination is no longer in the options: kept, inactive, for its history. */
   removed: z.boolean(),
+  packs: z.array(packSchema).max(10),
+  price_tiers: z.array(tierSchema).max(20),
+  branch_prices: z.array(branchPriceSchema),
 })
 
 export const variantGridSchema = z
@@ -59,6 +77,23 @@ export const variantGridSchema = z
           ctx.addIssue({ code: 'custom', path: ['variants', i, 'barcodes'], message: `Barcode ${code} is also on row ${(barcodes.get(code) ?? 0) + 1}.` })
         } else barcodes.set(code, i)
       }
+      v.packs.forEach((p, j) => {
+        const code = p.barcode.trim()
+        if (!code) return
+        if (barcodes.has(code)) ctx.addIssue({ code: 'custom', path: ['variants', i, 'packs', j, 'barcode'], message: barcodes.get(code) === i ? 'Already a barcode of this variant.' : `Also on row ${(barcodes.get(code) ?? 0) + 1}.` })
+        else barcodes.set(code, i)
+      })
+      const minimums = new Set<string>()
+      v.price_tiers.forEach((t, j) => {
+        const key = trimDecimal(t.min_quantity.trim())
+        if (key && minimums.has(key)) ctx.addIssue({ code: 'custom', path: ['variants', i, 'price_tiers', j, 'min_quantity'], message: 'Each break needs its own quantity.' })
+        minimums.add(key)
+      })
+      const branches = new Set<string>()
+      v.branch_prices.forEach((b, j) => {
+        if (b.branch_id && branches.has(b.branch_id)) ctx.addIssue({ code: 'custom', path: ['variants', i, 'branch_prices', j, 'branch_id'], message: 'This branch already has a price.' })
+        branches.add(b.branch_id)
+      })
       const compare = v.compare_at_price.trim()
       if (compare && MONEY_PATTERN.test(compare) && MONEY_PATTERN.test(v.selling_price.trim()) && compareDecimal(compare, v.selling_price.trim()) <= 0) {
         ctx.addIssue({ code: 'custom', path: ['variants', i, 'compare_at_price'], message: 'Must be higher than the selling price.' })
@@ -89,6 +124,28 @@ export function splitValues(value: string): string[] {
   return out
 }
 
+/** ST2c: the variant's single-unit barcodes (its pack barcodes are edited as packs). */
+export function unitBarcodes(v: Pick<ProductVariant, 'barcodes' | 'packs'>): string[] {
+  const packs = new Set((v.packs ?? []).map((p) => p.barcode))
+  return v.barcodes.filter((b) => !packs.has(b))
+}
+
+/** ST2c: a saved variant's barcodes sent back unchanged: unit codes, then its packs. */
+export function barcodesInput(v: Pick<ProductVariant, 'barcodes' | 'packs'>): (string | VariantPack)[] {
+  return [...unitBarcodes(v), ...(v.packs ?? []).map((p) => ({ barcode: p.barcode, units: p.units, pack_name: p.pack_name }))]
+}
+
+/**
+ * Server error key of a barcode ("variants.2.barcodes.3.units") → its grid cell. Unit barcodes come
+ * first in the payload, so a later index is a pack row. `unitCount`: unit barcodes sent for that row.
+ */
+export function barcodeErrorKey(key: string, unitCount: number): string {
+  const match = /^(variants\.\d+)\.barcodes\.(\d+)(?:\.(\w+))?$/.exec(key)
+  if (!match) return key
+  const index = Number(match[2])
+  return index < unitCount ? `${match[1]}.barcodes` : `${match[1]}.packs.${index - unitCount}.${match[3] ?? 'barcode'}`
+}
+
 export function splitBarcodes(value: string): string[] {
   return [...new Set(value.split(/[\s,]+/).map((v) => v.trim()).filter(Boolean))]
 }
@@ -96,7 +153,7 @@ export function splitBarcodes(value: string): string[] {
 export function emptyRow(optionValues: Record<string, string> = {}): GridRow {
   return {
     option_values: optionValues, sku: '', barcodes: '', purchase_price: '', selling_price: '', wholesale_price: '', compare_at_price: '',
-    reorder_level: '', is_active: true, opening_stock: '', removed: false,
+    reorder_level: '', is_active: true, opening_stock: '', removed: false, packs: [], price_tiers: [], branch_prices: [],
   }
 }
 
@@ -108,7 +165,7 @@ export function toGridValues(product: Product): VariantGridValues {
     id: v.id,
     option_values: { ...v.option_values },
     sku: v.sku,
-    barcodes: v.barcodes.join(', '),
+    barcodes: unitBarcodes(v).join(', '),
     purchase_price: v.purchase_price ?? '',
     selling_price: v.selling_price,
     wholesale_price: v.wholesale_price ?? '',
@@ -116,6 +173,9 @@ export function toGridValues(product: Product): VariantGridValues {
     reorder_level: trimLevel(v.reorder_level),
     is_active: v.is_active,
     opening_stock: '',
+    packs: (v.packs ?? []).map((p) => ({ barcode: p.barcode, units: trimDecimal(p.units), pack_name: p.pack_name ?? '' })),
+    price_tiers: (v.price_tiers ?? []).map((t) => ({ min_quantity: trimDecimal(t.min_quantity), price: t.price })),
+    branch_prices: (v.branch_prices ?? []).map((b) => ({ branch_id: b.branch_id, price: b.price })),
     // A saved variant whose combination is not part of the options any more.
     removed: options.length > 0 && !inOptions(v.option_values, options),
   }))
@@ -316,7 +376,9 @@ export function toGridInput(form: VariantGridValues): { input: VariantGridInput;
       ...(v.id ? { id: v.id } : {}),
       option_values: options.length ? v.option_values : {},
       sku: v.sku.trim() || null,
-      barcodes: splitBarcodes(v.barcodes),
+      barcodes: [...splitBarcodes(v.barcodes), ...v.packs.map((p) => ({ barcode: p.barcode.trim(), units: p.units.trim(), pack_name: p.pack_name.trim() }))],
+      price_tiers: v.price_tiers.map((t) => ({ min_quantity: t.min_quantity.trim(), price: t.price.trim() })),
+      branch_prices: v.branch_prices.map((b) => ({ branch_id: b.branch_id, price: b.price.trim() })),
       purchase_price: v.purchase_price.trim(),
       selling_price: v.selling_price.trim(),
       wholesale_price: v.wholesale_price.trim() || null,

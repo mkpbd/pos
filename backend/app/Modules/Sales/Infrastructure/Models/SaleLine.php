@@ -36,7 +36,7 @@ use Illuminate\Support\Carbon;
  * @property string $cost_total
  * @property Carbon $created_at
  * @property ?string $list_price POS1a: catalog price at the time (null for open-price products)
- * @property string $price_source POS1a: catalog | override | open
+ * @property string $price_source POS1a: catalog | override | open (ST2c: | wholesale | tier)
  * @property ?string $price_approved_by POS1a: the manager who approved a changed price
  * @property ?string $price_approval_id POS1a: the till approval used
  * @property string $promotion_discount POS1a: the promotion's part of discount_amount

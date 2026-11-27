@@ -2,7 +2,6 @@
 
 namespace App\Modules\Products\Presentation\Http\Requests;
 
-use App\Modules\Products\Domain\Barcode;
 use App\Modules\Products\Domain\ProductDefinitionRules;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -33,9 +32,8 @@ class SaveVariantGridRequest extends FormRequest
             'variants.*.wholesale_price' => ['nullable', ...$money],
             'variants.*.compare_at_price' => ['sometimes', 'nullable', 'regex:/^\d{1,16}(\.\d{1,2})?$/'],
             'variants.*.reorder_level' => ['nullable', 'decimal:0,3', 'min:0', 'max:999999999999999'],
-            'variants.*.barcodes' => ['array', 'max:10'],
-            'variants.*.barcodes.*' => ['string', 'max:'.Barcode::MAX_LENGTH],
             'variants.*.is_active' => ['boolean'],
+            ...SaveProductRequest::packAndPriceRules(),
             'variants.*.opening_stock' => ['sometimes', 'nullable', 'regex:/^\d{1,15}(\.\d{1,3})?$/'],
 
             'stock_store_id' => ['sometimes', 'nullable', 'uuid'],

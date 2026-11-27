@@ -71,6 +71,7 @@ class CustomerResource extends JsonResource
                 'id' => $this->group->id,
                 'name' => $this->group->name,
                 'discount_percent' => $this->group->discount_percent,
+                'price_level' => $this->group->price_level,
             ] : null),
             'credit_limit' => $this->credit_limit,
             'opening_balance' => $this->opening_balance,

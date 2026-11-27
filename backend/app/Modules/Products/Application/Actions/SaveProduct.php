@@ -2,17 +2,21 @@
 
 namespace App\Modules\Products\Application\Actions;
 
+use App\Modules\Branches\Application\Contracts\BranchDirectory;
 use App\Modules\Catalog\Application\Contracts\CatalogDirectory;
 use App\Modules\Products\Application\DTOs\ProductData;
 use App\Modules\Products\Application\DTOs\VariantData;
 use App\Modules\Products\Domain\ProductDefinitionRules;
 use App\Modules\Products\Infrastructure\Models\Product;
 use App\Modules\Products\Infrastructure\Models\ProductBarcode;
+use App\Modules\Products\Infrastructure\Models\ProductBranchPrice;
+use App\Modules\Products\Infrastructure\Models\ProductPriceTier;
 use App\Modules\Products\Infrastructure\Models\ProductVariant;
 use App\Modules\Shared\Application\Contracts\AuditTrail;
 use App\Modules\Shared\Application\Contracts\SequenceGenerator;
 use App\Modules\Shared\Application\Support\Changes;
 use App\Modules\Shared\Application\Tenancy\TenantContext;
+use App\Modules\Shared\Domain\ValueObjects\Decimal;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -21,9 +25,13 @@ use Illuminate\Validation\ValidationException;
  * Creates or fully replaces a product definition: product fields, its variants
  * (matched by id; omitted variants are archived) and each variant's barcodes.
  * Blank SKUs get the next "SKU-000123" number. Price changes are audited.
+ * ST2c: pack barcodes (units + pack name), quantity breaks and branch prices; a list left
+ * out (null) is kept, a list sent replaces the stored one.
  */
 class SaveProduct
 {
+    private const RELATIONS = ['barcodes', 'priceTiers', 'branchPrices'];
+
     private const REFERENCE_LABELS = [
         'category_id' => 'category',
         'brand_id' => 'brand',
@@ -36,6 +44,7 @@ class SaveProduct
         private readonly CatalogDirectory $catalog,
         private readonly SequenceGenerator $sequences,
         private readonly AuditTrail $audit,
+        private readonly BranchDirectory $branches,
     ) {}
 
     public function __invoke(?Product $product, ProductData $data): Product
@@ -43,12 +52,13 @@ class SaveProduct
         $organizationId = $this->tenant->requireOrganization();
         $errors = ProductDefinitionRules::violations($data);
         $errors += $this->referenceViolations($organizationId, $product, $data);
+        $errors += $this->packAndBranchViolations($organizationId, $data);
         $this->failIf($errors);
 
         return DB::transaction(function () use ($product, $data, $organizationId) {
             $creating = $product === null;
             $product ??= new Product(['organization_id' => $organizationId]);
-            $existing = $creating ? collect() : $product->variants()->with('barcodes')->get()->keyBy('id');
+            $existing = $creating ? collect() : $product->variants()->with(self::RELATIONS)->get()->keyBy('id');
             $before = $creating ? [] : $this->snapshot($product, $existing);
 
             $this->failIf($this->persistenceViolations($organizationId, $data, $existing));
@@ -72,7 +82,7 @@ class SaveProduct
 
             $this->syncVariants($product, $data, $existing, $organizationId);
 
-            $after = $this->snapshot($product, $product->variants()->with('barcodes')->get()->keyBy('id'));
+            $after = $this->snapshot($product, $product->variants()->with(self::RELATIONS)->get()->keyBy('id'));
             [$old, $new] = Changes::between($before, $after);
             if ($creating || $new !== []) {
                 $this->audit->record($creating ? 'product.created' : 'product.updated', $product, $old, $new);
@@ -103,6 +113,39 @@ class SaveProduct
         $errors = [];
         foreach ($this->catalog->invalidReferences($organizationId, $references) as $field) {
             $errors[$field] = 'The selected '.self::REFERENCE_LABELS[$field].' does not exist or is inactive.';
+        }
+
+        return $errors;
+    }
+
+    /**
+     * ST2c: pack units are whole unless the product's unit allows decimals; branch prices name
+     * branches of the organization.
+     *
+     * @return array<string, string>
+     */
+    private function packAndBranchViolations(string $organizationId, ProductData $data): array
+    {
+        $errors = [];
+        $allowDecimal = (bool) ($this->catalog->describe($organizationId, ['units' => [$data->unitId]])['units'][$data->unitId]['allow_decimal'] ?? false);
+        $branchIds = [];
+        foreach ($data->variants as $i => $variant) {
+            foreach ($variant->barcodes as $j => $barcode) {
+                $units = $variant->packs[$barcode]['units'] ?? '1';
+                if (! $allowDecimal && ! Decimal::isWhole($units)) {
+                    $errors["variants.{$i}.barcodes.{$j}.units"] = 'This product is sold in whole units; a pack holds a whole number of them.';
+                }
+            }
+            array_push($branchIds, ...array_column($variant->branchPrices ?? [], 'branch_id'));
+        }
+
+        $owned = $branchIds === [] ? [] : $this->branches->filterOwned(array_values(array_unique($branchIds)), $organizationId);
+        foreach ($data->variants as $i => $variant) {
+            foreach ($variant->branchPrices ?? [] as $k => $price) {
+                if (! in_array($price['branch_id'], $owned, true)) {
+                    $errors["variants.{$i}.branch_prices.{$k}.branch_id"] = 'The selected branch does not exist.';
+                }
+            }
         }
 
         return $errors;
@@ -204,7 +247,31 @@ class SaveProduct
 
             $current = $variant->barcodes()->pluck('barcode')->all();
             foreach (array_diff($variantData->barcodes, $current) as $barcode) {
-                $variant->barcodes()->create(['organization_id' => $organizationId, 'barcode' => $barcode]);
+                $variant->barcodes()->create(['organization_id' => $organizationId, 'barcode' => $barcode] + ($variantData->packs[$barcode] ?? []));
+            }
+            // ST2c: barcodes sent as objects set their pack data; plain codes keep theirs.
+            foreach (array_intersect_key($variantData->packs, array_flip($current)) as $barcode => $pack) {
+                $variant->barcodes()->where('barcode', (string) $barcode)->update($pack);
+            }
+            $this->syncPriceLists($variant, $variantData, $organizationId);
+        }
+    }
+
+    /**
+     * ST2c: replaces the variant's quantity breaks / branch prices when the list was sent.
+     */
+    private function syncPriceLists(ProductVariant $variant, VariantData $data, string $organizationId): void
+    {
+        if ($data->priceTiers !== null) {
+            ProductPriceTier::query()->where('variant_id', $variant->id)->delete();
+            foreach ($data->priceTiers as $tier) {
+                ProductPriceTier::query()->create(['organization_id' => $organizationId, 'variant_id' => $variant->id] + $tier);
+            }
+        }
+        if ($data->branchPrices !== null) {
+            ProductBranchPrice::query()->where('variant_id', $variant->id)->delete();
+            foreach ($data->branchPrices as $price) {
+                ProductBranchPrice::query()->create(['organization_id' => $organizationId, 'variant_id' => $variant->id] + $price);
             }
         }
     }
@@ -248,6 +315,11 @@ class SaveProduct
             'wholesale_price' => $v->wholesale_price,
             'is_active' => $v->is_active,
             'barcodes' => $v->barcodes->pluck('barcode')->sort()->values()->all(),
+            // ST2c: pack barcodes, quantity breaks and branch prices are audited like prices.
+            'packs' => $v->barcodes->filter(fn (ProductBarcode $b) => Decimal::compare($b->units, '1') !== 0)
+                ->mapWithKeys(fn (ProductBarcode $b) => [$b->barcode => trim($b->units.' '.$b->pack_name)])->sortKeys()->all(),
+            'price_tiers' => $v->priceTiers->map(fn (ProductPriceTier $t) => "{$t->min_quantity}: {$t->price}")->values()->all(),
+            'branch_prices' => $v->branchPrices->mapWithKeys(fn (ProductBranchPrice $b) => [$b->branch_id => $b->price])->sortKeys()->all(),
         ]])->sortKeys()->all();
 
         return $values;

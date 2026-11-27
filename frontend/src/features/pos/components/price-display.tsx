@@ -6,7 +6,7 @@ import type { PricedCart, PricedLine } from '@/features/pos/api'
 import type { CartLine } from '@/features/pos/cart-store'
 import { formatMoney, isZeroDecimal } from '@/lib/money'
 
-/** A line's unit price: the list price struck through when changed, and an open-price badge. */
+/** A line's unit price: the list price struck through when changed, and an open-price / wholesale / quantity-price badge. */
 export function LinePriceInfo({ line, priced }: { line: CartLine; priced: PricedLine | undefined }) {
   const open = priced?.open_price ?? line.open_price === true
   if (open && !line.unit_price) return <span className="font-medium text-destructive">Price needed</span>
@@ -22,6 +22,8 @@ export function LinePriceInfo({ line, priced }: { line: CartLine; priced: Priced
       )}
       <span className={overridden ? 'font-medium text-foreground' : undefined}>{formatMoney(unit)}</span>
       {open && <Badge variant="outline" className="ml-1">Open price</Badge>}
+      {priced?.price_source === 'wholesale' && <Badge variant="info" className="ml-1">Wholesale</Badge>}
+      {priced?.price_source === 'tier' && <Badge variant="info" className="ml-1">Qty price</Badge>}
     </>
   )
 }

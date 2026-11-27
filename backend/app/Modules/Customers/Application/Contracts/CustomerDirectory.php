@@ -7,7 +7,8 @@ namespace App\Modules\Customers\Application\Contracts;
  *
  * @phpstan-type CustomerInfo array{
  *   id: string, code: string, name: string, phone: ?string, is_active: bool, archived: bool,
- *   credit_limit: string, opening_balance: string, group_discount_percent: string
+ *   credit_limit: string, opening_balance: string, group_discount_percent: string,
+ *   price_level: 'retail'|'wholesale'
  * }
  */
 interface CustomerDirectory

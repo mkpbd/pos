@@ -18,6 +18,7 @@ class CustomerGroupResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'discount_percent' => $this->discount_percent,
+            'price_level' => $this->price_level,
             'customers_count' => $this->whenCounted('customers'),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

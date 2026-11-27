@@ -101,7 +101,7 @@ describe('ProductEditorPage', () => {
     expect(await screen.findByText('Barcode "96385074" is already assigned to another product.')).toBeInTheDocument()
     expect(body).toEqual({
       options: null,
-      variants: [{ id: 'v-1', option_values: {}, sku: 'SKU-000001', barcodes: ['96385074'], purchase_price: '18.50', selling_price: '26', wholesale_price: null, compare_at_price: null, reorder_level: '0', is_active: true }],
+      variants: [{ id: 'v-1', option_values: {}, sku: 'SKU-000001', barcodes: ['96385074'], purchase_price: '18.50', selling_price: '26', wholesale_price: null, compare_at_price: null, reorder_level: '0', is_active: true, price_tiers: [], branch_prices: [] }],
     })
   })
 

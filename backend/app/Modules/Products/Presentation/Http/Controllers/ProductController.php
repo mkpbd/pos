@@ -246,7 +246,7 @@ class ProductController
             return ($this->presenter($request, collect([$product])))($product);
         }
 
-        $product->load(['variants.barcodes', 'images', 'optionImages']);
+        $product->load(['variants.barcodes', 'variants.priceTiers', 'variants.branchPrices', 'images', 'optionImages']);
         $ids = $product->variants->pluck('id')->all();
         /** @var TenantUser $user */
         $user = $request->user();

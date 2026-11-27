@@ -9,8 +9,12 @@ export type CustomerGroup = {
   name: string
   description: string | null
   discount_percent: string
+  /** ST2c: wholesale members pay the variant's wholesale price at the till. */
+  price_level?: PriceLevel
   customers_count?: number
 }
+
+export type PriceLevel = 'retail' | 'wholesale'
 
 export type Customer = {
   id: string
@@ -134,7 +138,7 @@ export function useSaveCustomerGroupMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, input }: { id?: string; input: { name: string; description: string | null; discount_percent: string } }) =>
+    mutationFn: ({ id, input }: { id?: string; input: { name: string; description: string | null; discount_percent: string; price_level: PriceLevel } }) =>
       (id ? api.patch<CustomerGroup>(`/customer-groups/${id}`, input) : api.post<CustomerGroup>('/customer-groups', input)).then((r) => r.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.groups }),
   })

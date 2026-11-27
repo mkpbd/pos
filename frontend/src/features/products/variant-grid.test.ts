@@ -3,6 +3,8 @@ import type { Product } from '@/features/products/api'
 import { movePhoto, togglePhoto, toOptionImagesInput, toOptionPhotosState, MAX_PHOTOS_PER_VALUE } from '@/features/products/option-photos'
 import {
   addPercent,
+  barcodeErrorKey,
+  barcodesInput,
   applyBulk,
   bulkValueError,
   emptyRow,
@@ -132,8 +134,8 @@ describe('variant grid', () => {
       options: [{ name: 'Size', values: ['M', 'L'] }],
       stock_store_id: 's-1',
       variants: [
-        { id: 'v-m', option_values: { Size: 'M' }, sku: 'POLO-M', barcodes: ['1', '2'], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: '520', reorder_level: '0', is_active: true },
-        { option_values: { Size: 'L' }, sku: null, barcodes: [], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: null, reorder_level: '0', is_active: true, opening_stock: '4' },
+        { id: 'v-m', option_values: { Size: 'M' }, sku: 'POLO-M', barcodes: ['1', '2'], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: '520', reorder_level: '0', is_active: true, price_tiers: [], branch_prices: [] },
+        { option_values: { Size: 'L' }, sku: null, barcodes: [], purchase_price: '300', selling_price: '450', wholesale_price: null, compare_at_price: null, reorder_level: '0', is_active: true, price_tiers: [], branch_prices: [], opening_stock: '4' },
       ],
     })
     expect(gridErrorKey('variants.1.barcodes.0', rowOf)).toBe('variants.2.barcodes.0')
@@ -172,5 +174,60 @@ describe('photos by colour', () => {
       values: [{ value: 'Red', image_ids: ['i-2', 'i-1'] }, { value: 'Blue', image_ids: [] }],
     })
     expect(toOptionImagesInput({ photoOption: null, styles: {}, photos: {} }, withPhotos)).toEqual({ photo_option: null, styles: { Colour: null, Size: null }, values: [] })
+  })
+})
+
+describe('ST2c packs and prices in the grid', () => {
+  const withPacks = product({
+    options: null,
+    variants: [{
+      id: 'v-1', sku: 'JUICE', name: null, option_values: {}, purchase_price: '18.00', selling_price: '25.00', wholesale_price: '22.00', reorder_level: '0.000',
+      barcodes: ['111', '999'], is_active: true,
+      packs: [{ barcode: '999', units: '24.000', pack_name: 'Carton' }],
+      price_tiers: [{ min_quantity: '12.000', price: '23.00' }],
+      branch_prices: [{ branch_id: 'b-1', price: '24.00' }],
+    }],
+  })
+
+  it('splits unit barcodes from packs and sends packs as objects after the unit codes', () => {
+    const values = toGridValues(withPacks)
+    expect(values.variants[0]).toMatchObject({
+      barcodes: '111',
+      packs: [{ barcode: '999', units: '24', pack_name: 'Carton' }],
+      price_tiers: [{ min_quantity: '12', price: '23.00' }],
+      branch_prices: [{ branch_id: 'b-1', price: '24.00' }],
+    })
+    expect(toGridInput(values).input.variants[0]).toMatchObject({
+      barcodes: ['111', { barcode: '999', units: '24', pack_name: 'Carton' }],
+      price_tiers: [{ min_quantity: '12', price: '23.00' }],
+      branch_prices: [{ branch_id: 'b-1', price: '24.00' }],
+    })
+    expect(barcodesInput(withPacks.variants[0]!)).toEqual(['111', { barcode: '999', units: '24.000', pack_name: 'Carton' }])
+  })
+
+  it('validates packs, breaks and branch prices', () => {
+    const issues = (r: Partial<GridRow>) =>
+      variantGridSchema.safeParse({ options: [], stock_store_id: '', variants: [row({ barcodes: '111', ...r })] }).error?.issues.map((i) => `${i.path.join('.')}: ${i.message}`) ?? []
+    expect(issues({ packs: [{ barcode: '111', units: '1', pack_name: '' }] })).toEqual([
+      'variants.0.packs.0.units: More than 1 unit.',
+      'variants.0.packs.0.pack_name: Name it, e.g. Carton.',
+      'variants.0.packs.0.barcode: Already a barcode of this variant.',
+    ])
+    expect(issues({ price_tiers: [{ min_quantity: '1', price: '5' }, { min_quantity: '10', price: '4' }, { min_quantity: '10.0', price: '3' }] })).toEqual([
+      'variants.0.price_tiers.0.min_quantity: More than 1.',
+      'variants.0.price_tiers.2.min_quantity: Each break needs its own quantity.',
+    ])
+    expect(issues({ branch_prices: [{ branch_id: 'b-1', price: '5' }, { branch_id: 'b-1', price: '1.234' }] })).toEqual([
+      'variants.0.branch_prices.1.price: Amount with up to 2 decimals.',
+      'variants.0.branch_prices.1.branch_id: This branch already has a price.',
+    ])
+    expect(issues({ packs: [{ barcode: '999', units: '24', pack_name: 'Carton' }], price_tiers: [{ min_quantity: '12', price: '23' }] })).toEqual([])
+  })
+
+  it('puts server barcode errors on the unit barcodes or the pack row', () => {
+    expect(barcodeErrorKey('variants.0.barcodes.0', 1)).toBe('variants.0.barcodes')
+    expect(barcodeErrorKey('variants.0.barcodes.1.units', 1)).toBe('variants.0.packs.0.units')
+    expect(barcodeErrorKey('variants.0.barcodes.2', 1)).toBe('variants.0.packs.1.barcode')
+    expect(barcodeErrorKey('variants.0.sku', 1)).toBe('variants.0.sku')
   })
 })
