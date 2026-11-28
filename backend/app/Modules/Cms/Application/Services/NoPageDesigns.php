@@ -19,4 +19,9 @@ class NoPageDesigns implements PageDesigns
     {
         return false;
     }
+
+    public function deleteForPage(string $pageId): bool
+    {
+        return false;
+    }
 }

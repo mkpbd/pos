@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Banner } from '@/features/storefront/api'
@@ -190,14 +190,20 @@ describe('Inspector: content forms', () => {
     expect(screen.getByRole('combobox', { name: 'Fit' })).toBeInTheDocument()
   })
 
-  it('picks a divider colour from the theme or as hex', async () => {
+  it('picks a divider colour with the full colour control: theme, hex and opacity (B22a)', async () => {
     mockStore()
     const { user, last } = setup(el('divider', { line: 'solid', thickness: 1, width: 100, color: 'theme:border', align: 'center' }))
+    await user.click(screen.getByRole('button', { name: /^Colour: .*Change colour$/ }))
     expect(screen.getByRole('button', { name: 'Theme colour: Borders' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(screen.getByRole('button', { name: 'Theme colour: Primary' }))
     expect(last()).toMatchObject({ props: { color: 'theme:primary' } })
-    await user.type(screen.getByRole('textbox', { name: 'Colour hex value' }), '#12ab34')
+    const hex = screen.getByLabelText('Colour hex value')
+    await user.clear(hex)
+    await user.type(hex, '#12AB34')
     expect(last()).toMatchObject({ props: { color: '#12ab34' } })
+    fireEvent.change(screen.getByLabelText('Colour opacity'), { target: { value: '50' } })
+    expect(last()).toMatchObject({ props: { color: '#12ab3480' } })
+    await user.keyboard('{Escape}')
     await user.click(screen.getByRole('combobox', { name: 'Thickness' }))
     await user.click(await screen.findByRole('option', { name: '3 px' }))
     expect(last()).toMatchObject({ props: { thickness: 3 } })

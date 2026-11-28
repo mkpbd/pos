@@ -23,6 +23,9 @@ use Throwable;
  * B11: JPEG, PNG and WebP originals larger than RenditionPlan::MAX_SIDE on a side are
  * scaled down (aspect kept), and JPEGs are turned upright by their EXIF orientation; such
  * files are re-encoded without metadata. Everything else is stored byte for byte.
+ *
+ * B22a: AVIF is accepted only when GD reads it (GdImageProcessor::readsAvif()); otherwise
+ * 422 UNSUPPORTED_IMAGE.
  */
 class UploadMedia
 {
@@ -37,6 +40,12 @@ class UploadMedia
      */
     public function __invoke(UploadedFile $file, ?string $alt): array
     {
+        $mime = (string) $file->getMimeType();
+        // B22a: AVIF only where GD can read it (for the WebP renditions).
+        if ($mime === 'image/avif' && ! $this->images->readsAvif()) {
+            throw new BusinessRuleViolation('UNSUPPORTED_IMAGE', 'AVIF pictures need AVIF support on the server — upload JPEG, PNG or WebP.');
+        }
+
         $checksum = hash_file('sha256', $file->getRealPath());
 
         $existing = Media::query()->where('checksum', $checksum)->first();
@@ -49,7 +58,6 @@ class UploadMedia
             throw new BusinessRuleViolation('INVALID_IMAGE', 'The file is not a readable image.');
         }
 
-        $mime = (string) $file->getMimeType();
         $normalized = $this->images->normalizeUpload($file->getRealPath(), $mime, $dimensions[0], $dimensions[1]);
 
         $disk = (string) config('media.disk');

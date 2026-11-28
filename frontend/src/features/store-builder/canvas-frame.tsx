@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react'
-import { envelope, readCanvasMessage, type CanvasMessage, type CanvasProduct, type CanvasSurroundings, type FileDropHover, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
+import { envelope, PAGE_DROP_ID, readCanvasMessage, type CanvasMessage, type CanvasProduct, type CanvasSurroundings, type FileDropHover, type ParentMessage, type Rect } from '@/storefront/builder/canvas/protocol'
 import type { BuilderData, BuilderMedia, Device, DeviceOrder, PopupSettings, RenderSection, ScrollProgress } from '@/storefront/builder/types'
 import type { StorefrontBootstrap } from '@/storefront/types'
 import type { CanvasThemeSettings } from '@/storefront/builder/canvas/theme-override'
@@ -435,7 +435,8 @@ export function CanvasFrame(props: CanvasFrameProps) {
             <SpacingHandles nodeId={spacing.nodeId} nodeLabel={spacing.label} rect={spacingRect} scale={scale} values={spacing.values} deviceLabel={spacing.deviceLabel} onChange={spacing.onChange} guides={spacing.guides} />
           )}
           {Object.entries(uploads ?? {}).map(([id, upload]) => {
-            const r = rects[id]
+            // B22a: pictures dropped on the empty canvas have no node yet: the visible canvas.
+            const r = rects[id] ?? (id === PAGE_DROP_ID ? { x: 0, y: 0, w: width, h: frameHeight } : undefined)
             if (!r || r.h <= 0) return null
             const percent = upload.progress === null ? null : Math.round(upload.progress * 100)
             return (

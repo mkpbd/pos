@@ -5,7 +5,7 @@ import { bootstrapFixture } from '../../test-fixtures'
 import { documentOf, elementNode, IMAGE_MEDIA_ID, payloadOf } from '../test-payload'
 import { CanvasApp } from './canvas-app'
 import { dropTargetOf, fileTargetAt, galleryListOf } from './file-targets'
-import { envelope, readCanvasMessage, type ParentMessage } from './protocol'
+import { envelope, PAGE_DROP_ID, readCanvasMessage, type ParentMessage } from './protocol'
 import { createCanvasQueryClient } from './query-client'
 import type { TreeNode } from './text-fields'
 
@@ -90,6 +90,34 @@ describe('B21 file drop targets', () => {
     expect(dropTargetOf({ node_id: 'c_1', kind: 'insert', into: 'column', index: 1, before: 'e_img', rect: { x: 0, y: 0, w: 1, h: 0 }, line: true })).toEqual({ node_id: 'c_1', kind: 'insert', into: 'column', index: 1, before: 'e_img' })
   })
 
+  it('B22a: the empty canvas is a new-section target; an empty section’s own area adds to its column', () => {
+    document.body.innerHTML = `
+      <div data-b-empty-page=""><p>Empty</p></div>
+      <section data-b="s_e"><div data-b="c_e1"></div><div data-b="c_e2"></div></section>
+      <section data-b="s_bgpic"><div data-b="c_x"></div></section>`
+    const q = (id: string) => document.querySelector(`[data-b="${id}"]`)!
+    box(document.querySelector('[data-b-empty-page]')!, 0, 0, 1000, 500)
+    box(q('s_e'), 0, 500, 1000, 300)
+    box(q('c_e1'), 0, 520, 500, 260)
+    box(q('c_e2'), 500, 520, 500, 260)
+    box(q('s_bgpic'), 0, 800, 1000, 200)
+    box(q('c_x'), 0, 820, 1000, 160)
+    const nodes = new Map<string, TreeNode>([
+      ['s_e', { id: 's_e', type: 'section', style: {} }],
+      ['c_e1', { id: 'c_e1', type: 'column', style: {} }],
+      ['c_e2', { id: 'c_e2', type: 'column', style: {} }],
+      ['s_bgpic', { id: 's_bgpic', type: 'section', style: { base: { background: { type: 'image', image: { media_id: 'm' } } } } }],
+      ['c_x', { id: 'c_x', type: 'column', style: {} }],
+    ])
+    expect(fileTargetAt(document.querySelector('[data-b-empty-page] p'), { x: 10, y: 10 }, nodes)).toEqual({ node_id: PAGE_DROP_ID, kind: 'insert', into: 'page', index: 0, before: null, rect: { x: 0, y: 0, w: 1000, h: 500 } })
+    expect(dropTargetOf(fileTargetAt(document.querySelector('[data-b-empty-page]'), { x: 1, y: 1 }, nodes)!)).toEqual({ node_id: PAGE_DROP_ID, kind: 'insert', into: 'page', index: 0, before: null })
+    // The section's padding over its second column → that column; Shift keeps the background.
+    expect(fileTargetAt(q('s_e'), { x: 700, y: 505 }, nodes)).toMatchObject({ node_id: 'c_e2', kind: 'insert', into: 'column', index: 0, before: null })
+    expect(fileTargetAt(q('s_e'), { x: 700, y: 505 }, nodes, { background: true })).toMatchObject({ node_id: 's_e', kind: 'background' })
+    // A section that already has a background picture keeps taking it (B10).
+    expect(fileTargetAt(q('s_bgpic'), { x: 10, y: 805 }, nodes)).toMatchObject({ node_id: 's_bgpic', kind: 'background' })
+  })
+
   it('the protocol accepts drag-files and drop-files from the canvas', () => {
     for (const type of ['drag-files', 'drop-files']) {
       const event = new MessageEvent('message', { data: envelope({ type } as never), origin: ORIGIN, source: window })
@@ -163,6 +191,22 @@ describe('B21 files dropped on the canvas', () => {
     expect(drop.target).toEqual({ node_id: 'e_img', kind: 'replace' })
     expect(drop.files).toHaveLength(10)
     expect(sent('image-drop')).toHaveLength(1)
+  })
+
+  it('B22a: files dropped on the empty canvas go to a new section (drop-files, even one file)', async () => {
+    await mount()
+    const send = (data: ParentMessage) => act(() => void window.dispatchEvent(new MessageEvent('message', { data: envelope(data), origin: ORIGIN, source: window })))
+    const posted = vi.mocked(window.postMessage)
+    posted.mockClear()
+    send({ type: 'render', sections: [], data: {}, media: {}, selection: null, hover: null, errors: [], device: 'desktop', pending: [] })
+    const empty = await screen.findByTestId('canvas-empty')
+    const one = new File(['x'], 'photo.png', { type: 'image/png' })
+    drag('dragOver', empty, { dataTransfer: transfer([one]) })
+    drag('drop', empty, { dataTransfer: transfer([one]) })
+    const types = posted.mock.calls.map(([m]) => m as { type: string; target?: unknown; over?: unknown })
+    expect(types.find((m) => m.type === 'drag-files' && m.over)).toMatchObject({ over: { node_id: PAGE_DROP_ID, kind: 'insert', into: 'page' } })
+    expect(types.filter((m) => m.type === 'drop-files')).toEqual([expect.objectContaining({ target: { node_id: PAGE_DROP_ID, kind: 'insert', into: 'page', index: 0, before: null }, files: [one] })])
+    expect(types.filter((m) => m.type === 'image-drop')).toHaveLength(0)
   })
 
   it('a dragged text (not files) is left alone; leaving the canvas clears the place', async () => {

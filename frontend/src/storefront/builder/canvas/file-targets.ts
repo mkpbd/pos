@@ -1,4 +1,4 @@
-import type { FileDropHover, FileDropTarget, Rect } from './protocol'
+import { PAGE_DROP_ID, type FileDropHover, type FileDropTarget, type Rect } from './protocol'
 import { imageTargetOf, type TreeNode } from './text-fields'
 
 /*
@@ -84,11 +84,29 @@ function backgroundOf(chain: Hit[]): FileDropHover | null {
   return hit ? { node_id: hit.node.id, kind: 'background', rect: rectOf(hit.el) } : null
 }
 
+/** B22a: an empty section or inner row (no background picture yet): its column under the pointer, else its first. */
+function emptyRowColumn(row: Hit, point: { x: number }, nodes: ReadonlyMap<string, TreeNode>): Hit | null {
+  if (!ROWS.has(row.node.type) || imageTargetOf(row.node) === 'background') return null
+  const columns = columnChildren(row.el, nodes).filter((hit) => hit.node.type === 'column')
+  if (columns.length === 0 || columns.some((column) => columnChildren(column.el, nodes).length > 0)) return null
+  return (
+    columns.find((column) => {
+      const r = rectOf(column.el)
+      return point.x >= r.x && point.x <= r.x + r.w
+    }) ?? columns[0]!
+  )
+}
+
 export function fileTargetAt(start: EventTarget | null, point: { x: number; y: number }, nodes: ReadonlyMap<string, TreeNode>, options: { background?: boolean } = {}): FileDropHover | null {
   if (!(start instanceof Element) || start.closest('[data-b-global]')) return null
+  // B22a: the empty canvas — a new section.
+  const empty = start.closest('[data-b-empty-page]')
+  if (empty) return { node_id: PAGE_DROP_ID, kind: 'insert', into: 'page', index: 0, before: null, rect: rectOf(empty) }
   const chain = chainFrom(start, nodes)
   if (chain.length === 0) return null
   if (options.background) return backgroundOf(chain)
+  const emptyColumn = emptyRowColumn(chain[0]!, point, nodes)
+  if (emptyColumn) return insertAt(emptyColumn, [], 0)
 
   // A picture or a gallery-like element under the pointer (inside the nearest column).
   for (const { el, node } of chain) {

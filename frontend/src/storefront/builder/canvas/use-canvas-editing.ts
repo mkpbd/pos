@@ -226,7 +226,7 @@ export function useCanvasEditing({ post, sections, page, locale, selection }: Op
       event.preventDefault()
       const hit = targetOf(event)
       if (event.dataTransfer) event.dataTransfer.dropEffect = hit ? 'copy' : 'none'
-      setDropTarget(hit && hit.into !== 'column' ? hit.node_id : null)
+      setDropTarget(hit && hit.into !== 'column' && hit.into !== 'page' ? hit.node_id : null)
       const items = event.dataTransfer?.items
       tell(hit, items ? Array.from(items).filter((item) => item.kind === 'file').length || undefined : undefined)
     }

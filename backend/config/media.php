@@ -8,4 +8,9 @@ return [
     */
     'disk' => env('MEDIA_DISK', 'public'),
 
+    /*
+    | B22a: AVIF uploads are accepted when PHP's GD reads AVIF; false refuses them anyway.
+    */
+    'avif' => true,
+
 ];

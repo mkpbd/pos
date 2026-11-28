@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { SearchIcon, XIcon } from 'lucide-react'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../api'
 import { useLocale } from '../i18n/locale'
 import { isBuilderPayload } from '../builder/payload'
 import { PageRenderer } from '../builder/page-renderer'
+import { PhoneHeader } from '../builder/phone-header'
 import { useStoreLayout } from '../theme'
 import type { BuilderPage } from '../builder/types'
 import { HeaderActions } from './header-actions'
@@ -15,6 +15,7 @@ import { LanguageSwitcher } from './language-switcher'
 import { MainNav } from './main-nav'
 import { MediaImage } from './media-image'
 import { MobileMenu } from './mobile-menu'
+import { SearchPanel } from './search-panel'
 import { useIsDesktop, useIsTabletUp } from './use-media-query'
 
 /**
@@ -26,8 +27,8 @@ export function SiteHeader() {
   const { builder } = useStorefront()
   const desktop = useIsDesktop()
   const tabletUp = useIsTabletUp()
-  // B4: a header designed in the store builder, from 768 px; phones keep the compact header and its drawer.
-  if (tabletUp && isBuilderPayload(builder?.header)) return <BuilderHeader page={builder.header} />
+  // B4: a header designed in the store builder; B22a: below 768 px in its phone layout.
+  if (isBuilderPayload(builder?.header)) return <BuilderHeader page={builder.header} phone={!tabletUp} />
   if (desktop && style === 'centered') return <CenteredHeader />
   if (desktop && style === 'commerce') return <CommerceHeader />
   return <StandardHeader nameClassName={MOBILE_NAME[style]} />
@@ -170,39 +171,16 @@ function CommerceHeader() {
   )
 }
 
-/** A search icon that opens the product search in a panel from the top (focus moves into it; Escape closes). */
-function SearchPanel() {
-  const { t } = useLocale()
-  const [open, setOpen] = useState(false)
-  return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <button type="button" className="grid size-10 place-items-center rounded-md text-sf-heading transition hover:bg-sf-canvas hover:text-sf-accent" aria-label={t('common.openSearch')}>
-          <SearchIcon aria-hidden className="size-6" />
-        </button>
-      </SheetTrigger>
-      <SheetContent side="top" className="gap-0 border-b bg-sf-surface pb-10" data-testid="search-panel">
-        <SheetHeader className="mx-auto w-full max-w-3xl px-4 pt-8">
-          <SheetTitle className="font-heading text-2xl font-semibold text-sf-heading">{t('theme.header.searchTitle')}</SheetTitle>
-          <SheetDescription className="sr-only">{t('shell.search.label')}</SheetDescription>
-        </SheetHeader>
-        <div className="mx-auto w-full max-w-3xl px-4 pt-2">
-          <HeaderSearch autoFocus onDone={() => setOpen(false)} />
-        </div>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
 /**
- * The header designed in the store builder (B4), shown alone from 768 px. It keeps the theme's
- * sticky setting; its elements (logo, menu, search, account, wishlist, cart, …) are the store's own.
+ * The header designed in the store builder (B4), shown alone. It keeps the theme's sticky setting;
+ * its elements (logo, menu, search, account, wishlist, cart, …) are the store's own. B22a: below
+ * 768 px it is drawn in its phone layout (../builder/phone-header.tsx).
  */
-function BuilderHeader({ page }: { page: BuilderPage }) {
+function BuilderHeader({ page, phone }: { page: BuilderPage; phone: boolean }) {
   const { sticky_header } = useStoreLayout()
   return (
-    <header className={cn('z-40 bg-sf-surface', sticky_header && 'sticky top-0')} data-testid="site-header" data-header-style="builder">
-      <PageRenderer page={page} testId="builder-header" scope="header" />
+    <header className={cn('z-40 bg-sf-surface', sticky_header && 'sticky top-0')} data-testid="site-header" data-header-style="builder" data-header-device={phone ? 'mobile' : undefined}>
+      {phone ? <PhoneHeader page={page} scope="header" /> : <PageRenderer page={page} testId="builder-header" scope="header" />}
     </header>
   )
 }

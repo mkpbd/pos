@@ -235,9 +235,13 @@ export type ImageDropTarget = 'image' | 'background'
  * `insert`: new pictures — `into: 'column'` as image elements in the column `node_id` at `index`
  * (the drawn order) before the element `before` (null = at the end), `into: 'items'` as new items of
  * the gallery-like element `node_id` (gallery, carousels, photo grid, horizontal gallery).
+ * B22a: `into: 'page'` (node_id PAGE_DROP_ID) — the empty canvas: a new section at `index`.
  */
 export type FileDropKind = 'replace' | 'background' | 'insert'
-export type FileDropTarget = { node_id: string; kind: FileDropKind; into?: 'column' | 'items'; index?: number; before?: string | null }
+export type FileDropTarget = { node_id: string; kind: FileDropKind; into?: 'column' | 'items' | 'page'; index?: number; before?: string | null }
+
+/** B22a: the drop target id of the empty canvas (never a node id: those are `<prefix>_<chars>`). */
+export const PAGE_DROP_ID = 'page'
 export type FileDropHover = FileDropTarget & { rect: Rect; line?: boolean }
 
 /** B21: the most picture files one drop adds. */

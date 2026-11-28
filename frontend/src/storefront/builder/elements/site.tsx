@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useContext, useId } from 'react'
 import { MailIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStorefront } from '../../api'
@@ -10,12 +10,15 @@ import { LanguageSwitcher } from '../../components/language-switcher'
 import { MainNav } from '../../components/main-nav'
 import { MediaImage } from '../../components/media-image'
 import { MenuLink } from '../../components/menu-link'
+import { MobileMenu } from '../../components/mobile-menu'
+import { SearchPanel } from '../../components/search-panel'
 import { useLocale } from '../../i18n/locale'
 import { parseLocale } from '../../i18n/runtime'
 import type { MenuNode, SocialNetwork } from '../../types'
 import { colorCss } from '../compile-styles'
 import { SOCIAL_GLYPHS } from '../icons'
 import { DraftPlaceholder } from '../preview-mark'
+import { PhoneHeaderCtx } from '../render-context'
 import type { MenuData } from '../types'
 import { isMenuData } from './guards'
 import { B4_ENUMS, B4_LIMITS, boundedInt, oneOf, safeLink } from '../validate'
@@ -61,12 +64,23 @@ export function MenuElement({ element }: { element: El<'menu'> }) {
 
 function MenuBody({ element, menu }: { element: El<'menu'>; menu: MenuData }) {
   const { t } = useLocale()
+  const { store } = useStorefront()
+  const phone = useContext(PhoneHeaderCtx)
   const p = element.props ?? {}
   const layout = oneOf(p.layout, B4_ENUMS.menuLayout) ?? 'horizontal'
   const children = oneOf(p.show_children, [...B4_ENUMS.menuChildrenHeader, 'list'] as const) ?? 'none'
   const items = menuItems(Array.isArray(menu.items) ? menu.items : [], children)
   const label = menu.name || t('content.builder.menu')
   if (items.length === 0) return <DraftPlaceholder element={element} />
+
+  // B22a: the header on phones — a menu button opening a drawer (nested items expand).
+  if (phone) {
+    return (
+      <div data-b={element.id} className="b-menu inline-flex" data-testid="builder-menu">
+        <MobileMenu storeName={store.name} items={items} />
+      </div>
+    )
+  }
 
   if (layout === 'horizontal' && (children === 'dropdown' || children === 'mega')) {
     return (
@@ -105,6 +119,15 @@ function MenuBody({ element, menu }: { element: El<'menu'>; menu: MenuData }) {
 
 /** The header product search (suggestions as you type) with the element's texts. */
 export function SearchBoxElement({ element }: { element: El<'search_box'> }) {
+  // B22a: the header on phones — a search icon opening the search panel.
+  const phone = useContext(PhoneHeaderCtx)
+  if (phone) {
+    return (
+      <div data-b={element.id} className="b-search inline-flex">
+        <SearchPanel />
+      </div>
+    )
+  }
   return (
     <div data-b={element.id} className="b-search w-full">
       <HeaderSearch placeholder={str(element.props?.placeholder) || undefined} buttonLabel={str(element.props?.button_label) || undefined} />

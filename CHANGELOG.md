@@ -21,6 +21,25 @@ The online store can wear four looks — *Default* (unchanged), *Vegan Store*, *
 #### Tests
 - Backend 768 (PostgreSQL: 767 pass, 1 opt-in skip); vitest 900; mocked Playwright `storefront-themes.spec.ts` (each preset, desktop + mobile) and the admin preset mock.
 
+### B22a — Page builder fixes, the designed header on phones
+
+First of three page-builder phases asked by the owner (B22b product page, B22c editor speed & ease follow). No new packages.
+
+#### Added
+- The **designed header works on phones**: without phone settings, a compact row of its logo, search, cart and a menu button whose drawer lists the header's menu (nested items expand); with phone settings, the header as designed for phones; the editor's Phone preview shows and selects it.
+
+#### Fixed
+- **AVIF** pictures upload (when the server supports AVIF; otherwise a clear message).
+- **Dropping pictures** on an empty page, section or column adds them (one picture → image, several → gallery), with progress and undo.
+- **Deleting a CMS page** deletes its page design too (and a one-off clean-up removes designs left by earlier deletions).
+- **Fill the column width** can be turned off on a smaller device that inherits it; the **divider colour** has the full colour control; the read-only editor no longer logs a React warning.
+
+#### Tests
+- Backend 2150 (2149 pass, 1 opt-in skip) (PostgreSQL); Pint clean. vitest 3388; typecheck, lint, build clean. Browser tests not run (owner's instruction).
+
+#### Upgrade
+- `php artisan migrate`.
+
 ### VAT1 — Mushak 6.3 VAT invoice, 6.1 / 6.2 registers, monthly 9.1 summary
 
 From [FEATURE_GAP_AUDIT.md](docs/FEATURE_GAP_AUDIT.md) §2 (P1). Owner's choices: supplementary duty later (shown as 0, no price change); 6.3 on till sales and web orders. No new packages, no migrations.

@@ -1,10 +1,16 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { routes } from '@/app/routes'
 import type { CmsPage, ContactMessage, FaqItem } from '@/features/content/api'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
+
+const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+vi.mock('sonner', async (importOriginal) => {
+  const original = await importOriginal<typeof import('sonner')>()
+  return { ...original, toast: Object.assign(vi.fn(), { ...original.toast, ...toasts }) }
+})
 
 const editor = () => makeCurrentUser({ permissions: ['cms.manage', 'storefront.view', 'storefront.manage', 'media.manage'] })
 const paged = (items: unknown[], meta: Record<string, unknown> = {}) => ok(items, { pagination: { current_page: 1, per_page: 25, total: items.length, last_page: 1 }, ...meta })
@@ -63,6 +69,33 @@ describe('content pages', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/content/pages/p-9'))
     expect(created).toMatchObject({ title: 'Shipping & Returns', slug: 'shipping-returns', template: 'default', status: 'draft', published_at: null, body_html: null })
+  })
+
+  it.each([
+    ['its page design was removed too (B22a: 200 with design_removed)', { status: 200, body: { success: true, data: { design_removed: true }, meta: {} } }, 'Page deleted. Its page design was deleted too.'],
+    ['no design (200, design_removed false)', { status: 200, body: { success: true, data: { design_removed: false }, meta: {} } }, 'Page deleted.'],
+    ['an older 204 without a body', { status: 204 }, 'Page deleted.'],
+  ])('deletes a page and says so: %s', async (_name, response, message) => {
+    toasts.success.mockReset()
+    const user = userEvent.setup()
+    let deleted = false
+    mockApi({
+      'GET /auth/me': ok(editor()),
+      'GET /cms/pages/p-1': ok(page()),
+      'GET /cms/pages': paged([]),
+      'DELETE /cms/pages/p-1': () => {
+        deleted = true
+        return response
+      },
+    })
+    const { router } = renderRoutes(routes, '/content/pages/p-1')
+    await user.click(await screen.findByRole('button', { name: 'Delete page' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog).toHaveTextContent('the design is deleted with it')
+    await user.click(within(dialog).getByRole('button', { name: 'Delete page' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/content/pages'))
+    expect(deleted).toBe(true)
+    expect(toasts.success).toHaveBeenCalledWith(message)
   })
 
   it('refuses an invalid address before saving', async () => {

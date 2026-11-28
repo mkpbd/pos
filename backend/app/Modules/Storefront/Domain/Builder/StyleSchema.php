@@ -505,6 +505,9 @@ final class StyleSchema
     }
 
     /**
+     * B22a: `width` may be `auto` — a smaller device's explicit "do not fill the column width",
+     * overriding a `100%` inherited from a wider one.
+     *
      * @return array<string, string>|null
      */
     private static function size(mixed $value): ?array
@@ -514,7 +517,7 @@ final class StyleSchema
         }
 
         return self::compact([
-            'width' => self::length($value['width'] ?? null),
+            'width' => self::length($value['width'] ?? null, auto: true),
             'height' => self::length($value['height'] ?? null),
             'min_height' => self::length($value['min_height'] ?? null),
             'max_width' => self::length($value['max_width'] ?? null),

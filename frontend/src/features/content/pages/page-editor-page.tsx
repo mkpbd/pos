@@ -224,13 +224,13 @@ function Editor({ page }: { page?: CmsPage }) {
           open={deleting}
           onOpenChange={setDeleting}
           title="Delete this page?"
-          description="Visitors will no longer find it. A page that a menu links to cannot be deleted; remove the link first."
+          description="Visitors will no longer find it. If the page has a design made in the page builder, the design is deleted with it. A page that a menu links to cannot be deleted; remove the link first."
           confirmLabel="Delete page"
           pending={remove.isPending}
           onConfirm={() =>
             remove.mutate(page.id, {
-              onSuccess: () => {
-                toast.success('Page deleted.')
+              onSuccess: ({ designRemoved }) => {
+                toast.success(designRemoved ? 'Page deleted. Its page design was deleted too.' : 'Page deleted.')
                 void navigate('/content/pages')
               },
               onError: (error) => {

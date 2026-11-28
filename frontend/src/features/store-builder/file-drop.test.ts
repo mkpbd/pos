@@ -1,7 +1,9 @@
 import { ELEMENT_REGISTRY } from '@/storefront/builder/registry'
 import { cloneSample, elementNode } from '@/storefront/builder/test-payload'
 import type { BuilderContent, Column, Section } from '@/storefront/builder/types'
+import { PAGE_DROP_ID } from '@/storefront/builder/canvas/protocol'
 import { altFromFileName, applyDroppedPictures, dropLabel, type DroppedPicture } from './file-drop'
+import { validateNode } from './inspector/validate'
 import type { ElementsMetadata } from './inspector/types'
 import { findNode } from './tree'
 
@@ -109,5 +111,57 @@ describe('B21 pictures placed on the page', () => {
     expect(dropLabel({ kind: 'background' }, 1)).toBe('Use as background')
     expect(dropLabel({ kind: 'insert', into: 'column' }, 3)).toBe('Add 3 pictures here')
     expect(dropLabel({ kind: 'insert', into: 'items' })).toBe('Add to the gallery')
+  })
+})
+
+describe('B22a pictures dropped on an empty page, section or column', () => {
+  const page = { node_id: PAGE_DROP_ID, kind: 'insert' as const, into: 'page' as const, index: 0 }
+  const empty = (): BuilderContent => ({ schema_version: 1, sections: [] })
+  /** Media ids as the server gives them (the validator wants UUIDs). */
+  const uuids = (...names: string[]): DroppedPicture[] => pics(...names).map((p, i) => ({ ...p, mediaId: `0b6f2e3c-1a2b-4c3d-8e9f-01234567890${i}` }))
+
+  it('the empty canvas: one picture becomes a new section with an image', () => {
+    const out = applyDroppedPictures(empty(), page, uuids('fresh-mango.png'), ctx)
+    expect(out.content.sections).toHaveLength(1)
+    const elements = (out.content.sections[0]!.columns[0] as Column).elements
+    expect(elements).toHaveLength(1)
+    expect(elements[0]).toMatchObject({ type: 'image', props: { media_id: '0b6f2e3c-1a2b-4c3d-8e9f-012345678900', alt: 'Fresh mango' } })
+    expect(out).toMatchObject({ select: elements[0]!.id, placed: 1, note: null })
+    expect(validateNode(elements[0]!)).toEqual([])
+  })
+
+  it('the empty canvas: several pictures become a new section with one valid gallery', () => {
+    const out = applyDroppedPictures(empty(), page, uuids('a-cat.png', 'b-dog.png', 'c-cow.png'), ctx)
+    const elements = (out.content.sections[0]!.columns[0] as Column).elements
+    expect(elements.map((e) => e.type)).toEqual(['gallery'])
+    const images = (elements[0]!.props as { images: { id: string; media_id: string; alt: string; caption: string }[] }).images
+    expect(images.map((i) => [i.media_id.slice(-1), i.alt, i.caption])).toEqual([
+      ['0', 'A cat', ''],
+      ['1', 'B dog', ''],
+      ['2', 'C cow', ''],
+    ])
+    expect(new Set(images.map((i) => i.id)).size).toBe(3)
+    expect(out).toMatchObject({ select: elements[0]!.id, placed: 3 })
+    expect(validateNode(elements[0]!)).toEqual([])
+  })
+
+  it('no gallery where galleries aren’t allowed (a header): one image each', () => {
+    const out = applyDroppedPictures(empty(), page, pics('a.png', 'b.png'), { ...ctx, context: 'header' })
+    expect((out.content.sections[0]!.columns[0] as Column).elements.map((e) => e.type)).toEqual(['image', 'image'])
+  })
+
+  it('an empty column: several pictures make a gallery, one an image; a filled column keeps one image each', () => {
+    const content = cloneSample()
+    const story = content.sections.find((s) => s.id === 's_story') as Section
+    const emptyId = (story.columns[1] as Column).id
+    ;(story.columns[1] as Column).elements = []
+    const target = { node_id: emptyId, kind: 'insert' as const, into: 'column' as const, index: 0, before: null }
+    expect(column(applyDroppedPictures(content, target, pics('a.png', 'b.png'), ctx).content, emptyId).elements.map((e) => e.type)).toEqual(['gallery'])
+    expect(column(applyDroppedPictures(content, target, pics('a.png'), ctx).content, emptyId).elements.map((e) => e.type)).toEqual(['image'])
+    const filledId = (story.columns[0] as Column).id
+    const before = column(content, filledId).elements.length
+    const filled = applyDroppedPictures(content, { node_id: filledId, kind: 'insert', into: 'column', index: 0, before: null }, pics('a.png', 'b.png'), ctx)
+    expect(column(filled.content, filledId).elements).toHaveLength(before + 2)
+    expect(column(filled.content, filledId).elements.slice(-2).map((e) => e.type)).toEqual(['image', 'image'])
   })
 })

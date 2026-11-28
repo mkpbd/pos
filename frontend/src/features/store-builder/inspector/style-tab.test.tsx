@@ -17,9 +17,10 @@ vi.mock('@/features/content/components/rich-text-editor', () => ({
 const registry: ElementsMetadata = { types: [...ELEMENT_REGISTRY], limits: {}, enums: {} }
 const THEME = { colors: { primary: '#f59e0b', accent: '#6f55c2', canvas: '#f3f7fa', surface: '#ffffff', text: '#5f6368', heading: '#3d3d3d' }, palette: [{ name: 'Mango', hex: '#ffb300' }] }
 
-function setup(id: string, device: Device = 'desktop') {
+function setup(id: string, device: Device = 'desktop', prepare?: (node: BuilderNode) => void) {
   const content = cloneSample()
   const initial = findNode(content, id)!.node
+  prepare?.(initial)
   const onChange = vi.fn()
   const commands: InspectorCommand[] = []
   function Harness() {
@@ -164,5 +165,37 @@ describe('Style tab', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: 'Site styles' }))
     expect(commands).toEqual([{ type: 'open-site-styles' }])
+  })
+})
+
+describe('Style tab: "Fill the column width" per device (B22a)', () => {
+  async function openSize(user: ReturnType<typeof userEvent.setup>) {
+    await openStyle(user)
+    await user.click(within(screen.getByTestId('style-group-size')).getByRole('button', { name: /Size/ }))
+  }
+  const fullOnDesktop = (node: BuilderNode) => {
+    ;(node as Element).style = { base: { size: { width: '100%' } } }
+  }
+
+  it('turns off on mobile a full width inherited from desktop (an explicit auto), and back on', async () => {
+    const { user, last } = setup('e_button', 'mobile', fullOnDesktop)
+    await openSize(user)
+    const fill = screen.getByRole('switch', { name: 'Fill the column width' })
+    expect(fill).toBeEnabled()
+    expect(fill).toBeChecked()
+    await user.click(fill)
+    expect((last() as Element).style).toEqual({ base: { size: { width: '100%' } }, mobile: { size: { width: 'auto' } } })
+    expect(screen.getByRole('switch', { name: 'Fill the column width' })).not.toBeChecked()
+    await user.click(screen.getByRole('switch', { name: 'Fill the column width' }))
+    expect((last() as Element).style).toEqual({ base: { size: { width: '100%' } } })
+  })
+
+  it('on desktop: on writes 100 %, off removes it', async () => {
+    const { user, last } = setup('e_button', 'desktop')
+    await openSize(user)
+    await user.click(screen.getByRole('switch', { name: 'Fill the column width' }))
+    expect((last() as Element).style.base?.size).toEqual({ width: '100%' })
+    await user.click(screen.getByRole('switch', { name: 'Fill the column width' }))
+    expect((last() as Element).style.base?.size).toBeUndefined()
   })
 })

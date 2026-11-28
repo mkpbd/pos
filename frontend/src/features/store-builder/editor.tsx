@@ -173,8 +173,19 @@ const layerKeyboardCoordinates: KeyboardCoordinateGetter = (event, { currentCoor
   return undefined
 }
 
-/** B16: no drag sensors while someone else edits the page. */
-const NO_SENSORS: ReturnType<typeof useSensors> = []
+/** B16: a sensor that never starts a drag, for while someone else edits the page. */
+class NoDragSensor extends PointerSensor {
+  static override activators: typeof PointerSensor.activators = []
+}
+
+/**
+ * B22a: read-only keeps a sensor list of the same length (dnd-kit's setup effect depends on each
+ * sensor; an empty list changed its size and React warned).
+ */
+const NO_SENSORS: ReturnType<typeof useSensors> = [
+  { sensor: NoDragSensor, options: {} },
+  { sensor: NoDragSensor, options: {} },
+]
 
 const collision: CollisionDetection = (args) => (args.pointerCoordinates ? pointerWithin(args) : closestCenter(args))
 

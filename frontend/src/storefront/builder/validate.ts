@@ -295,7 +295,8 @@ export function normalizeStyleValue(value: unknown): Style | undefined {
     : undefined
   const size = isObject(value.size)
     ? compact({
-        width: normalizeLength(value.size.width, NON_NEGATIVE),
+        // B22a: `auto` turns off a width ("Fill the column width") inherited from a wider device.
+        width: normalizeLength(value.size.width, { ...NON_NEGATIVE, auto: true }),
         height: normalizeLength(value.size.height, NON_NEGATIVE),
         min_height: normalizeLength(value.size.min_height, NON_NEGATIVE),
         max_width: normalizeLength(value.size.max_width, NON_NEGATIVE),

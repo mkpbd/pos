@@ -24,6 +24,17 @@ final class GdImageProcessor
     /** Supported for scaling and editing; GIFs are left alone so animations survive. */
     public const EDITABLE = ['image/jpeg', 'image/png', 'image/webp'];
 
+    /**
+     * B22a: whether AVIF uploads are accepted — GD reads AVIF here and `media.avif` is not
+     * switched off. AVIF originals are stored as uploaded; their renditions are WebP.
+     */
+    public function readsAvif(): bool
+    {
+        return config('media.avif', true) !== false
+            && function_exists('imagecreatefromavif')
+            && (gd_info()['AVIF Support'] ?? false) === true;
+    }
+
     private const JPEG_QUALITY = 85;
 
     private const WEBP_QUALITY = 85;

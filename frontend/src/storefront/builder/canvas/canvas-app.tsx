@@ -13,6 +13,8 @@ import { formatPrice } from '../../money'
 import { applyCssVars, applyDataAttributes, themeDataAttributes, themeToCssVars } from '../../theme'
 import type { StorefrontBootstrap, StorefrontTheme } from '../../types'
 import { PageRenderer } from '../page-renderer'
+import { PhoneHeader } from '../phone-header'
+import { hasPhoneSettings } from '../phone-settings'
 import { PopupFrame } from '../popups/popup-frame'
 import { motionTargets } from '../compile-styles'
 import { motionAllowed, playMotionScope } from '../motion'
@@ -738,12 +740,13 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
   // The document being edited (not named `document`: the effects above use the global one).
   const drawn =
     page.sections.length === 0 ? (
-      <div data-testid="canvas-empty" className={`grid place-items-center p-8 text-center text-neutral-500 ${surroundings === 'page' ? 'min-h-[60vh]' : 'min-h-40 border-y border-dashed border-neutral-300'}`}>
+      <div data-testid="canvas-empty" data-b-empty-page="" className={`grid place-items-center p-8 text-center text-neutral-500 ${surroundings === 'page' ? 'min-h-[60vh]' : 'min-h-40 border-y border-dashed border-neutral-300'}`}>
         <p className="max-w-sm text-sm">{emptyText}</p>
       </div>
     ) : surroundings === 'header' ? (
       <header data-canvas-part="header">
-        <PageRenderer page={page} placeholder={placeholder} device={device} />
+        {/* B22a: the Phone preview draws the header in its phone layout, as phones show it. */}
+        {device === 'mobile' ? <PhoneHeader page={page} placeholder={placeholder} testId="builder-page" /> : <PageRenderer page={page} placeholder={placeholder} device={device} />}
       </header>
     ) : surroundings === 'footer' ? (
       <footer data-canvas-part="footer">
@@ -764,9 +767,11 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
           <style data-testid="canvas-outlines">{outlineCss(frame, editor.dropTarget)}</style>
           <style data-testid="canvas-audience">{audienceCss(verdicts.hidden)}</style>
           <main id="main" className="min-h-screen" data-surroundings={surroundings}>
-            {surroundings === 'header' && frame?.device === 'mobile' && (
-              <p role="note" data-testid="canvas-compact-note" className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
-                Phones (narrower than 768 px) show your store’s compact header instead of this one. Switch to tablet or desktop to see it in use.
+            {surroundings === 'header' && device === 'mobile' && page.sections.length > 0 && (
+              <p role="note" data-testid="canvas-phone-note" className="border-b border-sky-200 bg-sky-50 px-4 py-2 text-center text-xs text-sky-900">
+                {hasPhoneSettings(page)
+                  ? 'Phones (narrower than 768 px) show this header with its Phone settings: menus as a menu button, the search as an icon.'
+                  : 'Phones (narrower than 768 px) show this compact header: logo, search, cart and a menu button. Set anything for Phone — hide a part, a column width, the order or a style — to lay it out yourself.'}
               </p>
             )}
             {samples.before}
@@ -776,7 +781,7 @@ export function CanvasApp({ parent = window.parent, origin = window.location.ori
                 <PopupPageSample />
                 <PopupFrame id="canvas" settings={popupSettings} page={page} mode="canvas" device={device} />
                 {page.sections.length === 0 && (
-                  <p data-testid="canvas-empty" className="absolute inset-x-0 top-4 z-[70] mx-auto max-w-sm rounded bg-white/90 p-3 text-center text-sm text-neutral-600 shadow">
+                  <p data-testid="canvas-empty" data-b-empty-page="" className="absolute inset-x-0 top-4 z-[70] mx-auto max-w-sm rounded bg-white/90 p-3 text-center text-sm text-neutral-600 shadow">
                     {emptyText}
                   </p>
                 )}

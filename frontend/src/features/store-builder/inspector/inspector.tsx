@@ -133,7 +133,7 @@ function ContentForm({ node, onChange, onCommand, errors, bangla, content, b4, d
     case 'button':
       return <ButtonForm node={node as ButtonElement} {...common} context={b4.context} />
     case 'divider':
-      return <DividerForm node={node as DividerElement} {...common} />
+      return <DividerForm node={node as DividerElement} {...common} theme={b4.theme} />
     case 'spacer':
       return <SpacerForm node={node as SpacerElement} {...common} />
     case 'inner_row':

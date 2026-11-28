@@ -40,8 +40,8 @@ export type MediaUsage = { in_use: boolean; places: string[] }
 /** GIFs may be animated and are not edited. */
 export const isEditable = (item: Pick<MediaItem, 'mime_type'>) => ['image/jpeg', 'image/png', 'image/webp'].includes(item.mime_type)
 
-/** Accepted by the API: JPEG, PNG, WebP, GIF up to 5 MB. */
-export const MEDIA_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
+/** Accepted by the API: JPEG, PNG, WebP, GIF, AVIF (B22a: when the server can read it) up to 5 MB. */
+export const MEDIA_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif'
 export const MEDIA_MAX_BYTES = 5 * 1024 * 1024
 
 export const mediaKeys = {
@@ -142,7 +142,7 @@ export function formatBytes(bytes: number): string {
 
 /** Client-side pre-check mirroring the API rules, so obviously wrong files never upload. */
 export function rejectReason(file: File): string | null {
-  if (!MEDIA_ACCEPT.split(',').includes(file.type)) return `${file.name}: only JPEG, PNG, WebP or GIF images.`
+  if (!MEDIA_ACCEPT.split(',').includes(file.type)) return `${file.name}: only JPEG, PNG, WebP, GIF or AVIF images.`
   if (file.size > MEDIA_MAX_BYTES) return `${file.name}: larger than 5 MB.`
   return null
 }

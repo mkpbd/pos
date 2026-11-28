@@ -111,7 +111,7 @@ describe('store builder editor: document kinds (B4)', () => {
   it('a header shows where it sits and offers only header elements', async () => {
     mockKind({ kind: 'header', key: 'header', title: 'Header', path: null, preview_url: null })
     renderRoutes(routes, '/storefront/builder/doc-1')
-    expect(await screen.findByTestId('document-placement')).toHaveTextContent('Shown at the top of every page. On phones the store uses its compact header.')
+    expect(await screen.findByTestId('document-placement')).toHaveTextContent('Shown at the top of every page. Phones show its phone layout — see the Phone preview.')
     const types = addable()
     expect(types).toEqual(expect.arrayContaining(['add-logo', 'add-menu', 'add-cart_icon', 'add-account_link', 'add-search_box', 'add-announcement', 'add-heading']))
     expect(types).not.toContain('add-hero_slider')

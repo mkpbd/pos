@@ -282,7 +282,7 @@ describe('builder canvas: headers, footers and zones (B4)', () => {
     type: 'render', sections: page.sections, data: page.data, media: page.media, selection: null, hover: null, errors: [], device: 'desktop', pending: [], ...overrides,
   })
 
-  it('draws a header above a faded sample page; phones get a note about the compact header', async () => {
+  it('draws a header above a faded sample page; the Phone preview notes its phone layout', async () => {
     const send = mount()
     send({ type: 'init', bootstrap: bootstrapFixture(), locale: 'en' })
     send(render$({ surroundings: 'header' }))
@@ -293,10 +293,10 @@ describe('builder canvas: headers, footers and zones (B4)', () => {
     const sample = screen.getByTestId('canvas-sample')
     expect(sample).toHaveAttribute('aria-hidden', 'true')
     expect(header.compareDocumentPosition(sample) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByTestId('canvas-compact-note')).toBeNull()
+    expect(screen.queryByTestId('canvas-phone-note')).toBeNull()
 
     send(render$({ surroundings: 'header', device: 'mobile' }))
-    expect(await screen.findByTestId('canvas-compact-note')).toHaveTextContent('compact header')
+    expect(await screen.findByTestId('canvas-phone-note')).toHaveTextContent('Phones (narrower than 768 px)')
   })
 
   it('draws a footer and the listing-bottom zone below their samples, with the kind’s empty text', async () => {

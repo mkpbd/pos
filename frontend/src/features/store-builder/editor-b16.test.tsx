@@ -210,6 +210,19 @@ describe('store builder editor (B16): presence & the edit lock', () => {
     expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled()
   })
 
+  it('B22a: switching to read-only and back keeps the drag sensors stable (no React hook warning)', async () => {
+    const user = userEvent.setup()
+    const errors = vi.spyOn(console, 'error')
+    mockEditor({ presence: () => presenceOf(RIMA) })
+    await openEditor()
+    const banner = await screen.findByTestId('presence-banner')
+    await user.click(within(banner).getByRole('button', { name: 'Take over' }))
+    await waitFor(() => expect(screen.queryByTestId('presence-banner')).not.toBeInTheDocument())
+    const sizeWarnings = errors.mock.calls.filter((call) => call.some((arg) => typeof arg === 'string' && arg.includes('changed size between renders')))
+    expect(sizeWarnings).toEqual([])
+    errors.mockRestore()
+  })
+
   it('offers no Take over to people who can’t publish while the lease is live', async () => {
     mockEditor({ permissions: ['storefront.view', 'storefront.manage'], presence: () => presenceOf(RIMA) })
     await openEditor()

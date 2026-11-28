@@ -13,7 +13,7 @@ use Throwable;
 class EloquentMediaLibrary implements MediaLibrary
 {
     /** B5: the upload limits of `POST /media` (MediaController::store) for imported files. */
-    private const IMPORT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    private const IMPORT_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
 
     private const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -134,7 +134,7 @@ class EloquentMediaLibrary implements MediaLibrary
         if ($size === false || $size > self::IMPORT_MAX_BYTES || $dimensions === false
             || ! in_array($dimensions['mime'] ?? null, self::IMPORT_MIMES, true)
             || $dimensions[0] > self::IMPORT_MAX_SIDE || $dimensions[1] > self::IMPORT_MAX_SIDE) {
-            throw new BusinessRuleViolation('INVALID_IMAGE', 'The file is not a supported image (JPEG, PNG, WebP or GIF up to 5 MB and 6000 × 6000 px).', ['name' => $name]);
+            throw new BusinessRuleViolation('INVALID_IMAGE', 'The file is not a supported image (JPEG, PNG, WebP, GIF or AVIF up to 5 MB and 6000 × 6000 px).', ['name' => $name]);
         }
 
         // Stored with storeAs(), which copies the file: the original stays in place.

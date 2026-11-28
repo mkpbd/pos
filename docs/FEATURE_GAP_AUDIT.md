@@ -139,7 +139,7 @@ all 86 permissions are used; no TODO/FIXME markers. Remaining:
 > adjustment detail endpoint now has a page. Still open, found during Q1: a stock count can't enter a *new* batch number
 > from the screen (the API accepts `batch_number`); the page builder's read-only mode swaps the drag sensors list for an
 > empty one (`editor.tsx`, React dev warning "final argument passed to useEffect changed size"; harmless in production);
-> AVIF pictures are not accepted by the media upload; dropping pictures on an empty builder page does nothing.
+> AVIF pictures are not accepted by the media upload; dropping pictures on an empty builder page does nothing. *(All three fixed in B22a.)*
 
 ---
 

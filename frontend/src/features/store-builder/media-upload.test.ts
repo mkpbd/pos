@@ -47,6 +47,7 @@ describe('picture drop (B10)', () => {
 
   it('accepts JPEG, PNG, WebP and GIF up to 5 MB', () => {
     expect(pictureFileProblem(file('a.jpg', 'image/jpeg'))).toBeNull()
+    expect(pictureFileProblem(file('a.avif', 'image/avif'))).toBeNull()
     expect(pictureFileProblem(file('a.pdf', 'application/pdf'))).toMatch(/isn’t a picture we can use/)
     expect(pictureFileProblem({ name: 'big.png', type: 'image/png', size: 6 * 1024 * 1024 })).toMatch(/larger than 5 MB/)
   })
@@ -77,6 +78,10 @@ describe('picture drop (B10)', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect(uploadErrorMessage(error, 'a.png')).toBe('“a.png”: The file is too big.')
     expect(uploadErrorMessage(new ApiError(403, 'FORBIDDEN', 'No.'), 'a.png')).toMatch(/permission/)
+    // B22a: the server's AVIF refusal is shown as it says it.
+    expect(uploadErrorMessage(new ApiError(422, 'UNSUPPORTED_IMAGE', 'AVIF pictures need AVIF support on the server — upload JPEG, PNG or WebP.'), 'a.avif')).toBe(
+      '“a.avif” couldn’t be uploaded: AVIF pictures need AVIF support on the server — upload JPEG, PNG or WebP.',
+    )
     expect(uploadErrorMessage(new Error('x'), 'a.png')).toMatch(/couldn’t be uploaded/)
 
     const offline = uploadPicture(file('b.png', 'image/png'))

@@ -508,18 +508,19 @@ function SizeGroup({ node, bp, device, get, set, status, onCommand, easy = false
   // B21: Easy mode keeps only a button's "Fill the column width" (no size numbers).
   const fields = easy ? [] : node.type === 'spacer' ? SIZE_FIELDS.filter((f) => f.key === 'height') : node.type === 'divider' ? SIZE_FIELDS.filter((f) => f.key === 'width' || f.key === 'max_width') : SIZE_FIELDS
   const widthValue = get<string>(['size', 'width'])
-  // Full width inherited from a wider device can only be changed there (width has no "auto").
-  const inheritedFull = widthValue.value === '100%' && widthValue.origin.kind === 'inherited'
+  // B22a: off on a smaller device whose wider one fills the width writes `auto` here (it overrides the inherited 100 %).
+  const wider = CASCADE[bp][1]
+  const widerFull = wider !== undefined && resolveStyleValue<string>((node as { style?: ResponsiveStyle }).style ?? {}, wider, ['size', 'width']).value === '100%'
   return (
     <>
       {!easy && node.type === 'column' && <ColumnWidthField column={node as Column} bp={bp} device={device} onCommand={onCommand} />}
       {node.type === 'button' && (
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <Switch id={`fill-${node.id}`} checked={widthValue.value === '100%'} disabled={inheritedFull} onCheckedChange={(on) => set(['size', 'width'], on ? '100%' : undefined)} />
+            <Switch id={`fill-${node.id}`} checked={widthValue.value === '100%'} onCheckedChange={(on) => set(['size', 'width'], on ? (widerFull ? undefined : '100%') : widerFull ? 'auto' : undefined)} />
             <label htmlFor={`fill-${node.id}`} className="text-sm">Fill the column width</label>
           </div>
-          {inheritedFull && <p className="text-xs text-muted-foreground">Full width comes from a wider device; change it there.</p>}
+          {widerFull && widthValue.origin.kind === 'inherited' && <p className="text-xs text-muted-foreground">On because a wider device fills the width; turn it off to keep the button’s own width here.</p>}
         </div>
       )}
       {fields.map((f) => (

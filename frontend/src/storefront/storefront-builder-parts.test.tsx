@@ -483,14 +483,15 @@ describe('builder header and footer', () => {
     expect(within(header).queryByRole('button', { name: 'Open search' })).toBeNull()
   })
 
-  it('keeps the compact header with its drawer below 768 px', async () => {
+  it('draws the builder header in its phone layout below 768 px (B22a)', async () => {
     viewport(375)
     renderStore({ home: false, header: headerPayload(), footer: null })
     renderRoutes(storefrontRoutes, '/pages/about')
     const header = await screen.findByTestId('site-header')
-    expect(header).not.toHaveAttribute('data-header-style')
+    expect(header).toHaveAttribute('data-header-style', 'builder')
+    expect(header).toHaveAttribute('data-header-device', 'mobile')
+    expect(within(header).getByTestId('builder-header')).toBeInTheDocument()
     expect(within(header).getByRole('button', { name: 'Open search' })).toBeInTheDocument()
-    expect(screen.queryByTestId('builder-header')).toBeNull()
   })
 
   it('renders exactly the theme header and footer without builder payloads', async () => {

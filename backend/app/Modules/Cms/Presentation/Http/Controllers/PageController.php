@@ -62,11 +62,16 @@ class PageController
         return ApiResponse::success(CmsPresenter::page($save->save($page, $request->validate($this->rules($page))), true));
     }
 
+    /**
+     * Delete a page
+     *
+     * B22a: its store builder design (versions, schedules, reviews, comments) is deleted with it;
+     * 200 `{design_removed: bool}`. 422 IN_USE while a menu links to it; 423 DOCUMENT_LOCKED while
+     * someone else is editing its design.
+     */
     public function destroy(CmsPage $page, SavePage $save): JsonResponse
     {
-        $save->delete($page);
-
-        return ApiResponse::noContent();
+        return ApiResponse::success(['design_removed' => $save->delete($page)]);
     }
 
     /**

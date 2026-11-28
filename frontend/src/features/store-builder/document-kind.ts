@@ -149,7 +149,7 @@ export function kindInfo(doc: { kind: DocumentKind; key: string; target?: ZoneTa
     case 'header':
       return {
         noun: 'header',
-        placement: 'Shown at the top of every page. On phones the store uses its compact header.',
+        placement: 'Shown at the top of every page. Phones show its phone layout — see the Phone preview.',
         empty: 'Your header is empty. Drag the logo, a menu or the cart from the Add panel onto this area.',
         sample: 'below',
       }

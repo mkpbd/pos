@@ -103,6 +103,15 @@ describe('compileStyles', () => {
     expect(css).toContain('[data-b="c_feat_a"]{flex:0 1 calc(33.33% - var(--b-gap) * 0.6667);')
   })
 
+  it('B22a: a smaller device turns an inherited full width off with width auto (kept by the validator; no other "auto" sizes)', () => {
+    const style = { base: { size: { width: '100%' } }, mobile: { size: { width: 'auto', height: 'auto' } } }
+    expect(normalizeStyle(style)).toEqual({ base: { size: { width: '100%' } }, mobile: { size: { width: 'auto' } } })
+    const css = compileStyles(docWith(style) as never, { media: {} })
+    const mobile = css.indexOf('@media (max-width: 639px){')
+    expect(css.slice(0, mobile)).toContain('[data-b="e_one"]{width:100%}')
+    expect(css.slice(mobile, css.indexOf('\n}', mobile))).toContain('[data-b="e_one"]{width:auto}')
+  })
+
   it('hides a node per device in exactly that range', () => {
     const css = compileStyles(docWith({}, { visibility: { desktop: false, tablet: false, mobile: false } }))
     expect(css).toContain('@media (max-width: 639px){\n  [data-b="e_one"]{display:none}\n}')

@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { routes } from '@/app/routes'
-import { formatBytes, rejectReason, type MediaItem } from '@/features/media/api'
+import { formatBytes, MEDIA_ACCEPT, rejectReason, type MediaItem } from '@/features/media/api'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
 
@@ -79,6 +79,9 @@ describe('media library', () => {
     expect(rejectReason(new File(['x'], 'a.svg', { type: 'image/svg+xml' }))).toMatch(/only JPEG/)
     expect(rejectReason(new File([new Uint8Array(6 * 1024 * 1024)], 'big.png', { type: 'image/png' }))).toMatch(/5 MB/)
     expect(rejectReason(new File(['x'], 'ok.webp', { type: 'image/webp' }))).toBeNull()
+    // B22a: AVIF goes to the server, which says when it can't read it.
+    expect(rejectReason(new File(['x'], 'ok.avif', { type: 'image/avif' }))).toBeNull()
+    expect(MEDIA_ACCEPT.split(',')).toContain('image/avif')
     expect(formatBytes(2_621_440)).toBe('2.5 MB')
   })
 })

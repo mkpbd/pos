@@ -2,6 +2,7 @@
 
 namespace App\Modules\Cms\Application\Actions;
 
+use App\Modules\Cms\Application\Contracts\PageDesigns;
 use App\Modules\Cms\Application\Contracts\PageReferences;
 use App\Modules\Cms\Domain\PageStatus;
 use App\Modules\Cms\Infrastructure\Models\CmsPage;
@@ -33,6 +34,7 @@ class SavePage
         private readonly HtmlSanitizer $sanitizer,
         private readonly AuditTrail $audit,
         private readonly Container $container,
+        private readonly PageDesigns $designs,
     ) {}
 
     /**
@@ -74,7 +76,10 @@ class SavePage
         });
     }
 
-    public function delete(CmsPage $page): void
+    /**
+     * Whether a builder design of the page was deleted with it (B22a).
+     */
+    public function delete(CmsPage $page): bool
     {
         /** @var iterable<PageReferences> $references */
         $references = $this->container->tagged(PageReferences::TAG);
@@ -84,9 +89,13 @@ class SavePage
             }
         }
 
-        DB::transaction(function () use ($page) {
+        // B22a: the page's builder design goes with it, all or nothing.
+        return DB::transaction(function () use ($page) {
+            $designRemoved = $this->designs->deleteForPage($page->id);
             $page->delete();
-            $this->audit->record('cms_page.deleted', $page, $this->snapshot($page));
+            $this->audit->record('cms_page.deleted', $page, $this->snapshot($page), context: $designRemoved ? ['design_removed' => true] : []);
+
+            return $designRemoved;
         });
     }
 

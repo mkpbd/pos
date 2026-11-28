@@ -131,7 +131,7 @@ class CmsPagesTest extends TestCase
         $this->actingAsUser($admin);
         $this->deleteJson("/api/v1/cms/pages/{$page}")->assertUnprocessable()->assertJsonPath('error.code', 'IN_USE');
         $this->putJson("/api/v1/storefront/menus/{$menu}/items", ['items' => [['label' => 'Home', 'url' => '/']]])->assertOk();
-        $this->deleteJson("/api/v1/cms/pages/{$page}")->assertNoContent();
+        $this->deleteJson("/api/v1/cms/pages/{$page}")->assertOk()->assertJsonPath('data.design_removed', false);
         // The slug is free again once the page is deleted.
         $this->postJson('/api/v1/cms/pages', ['slug' => 'about-berry', 'title' => 'About again'])->assertCreated();
     }

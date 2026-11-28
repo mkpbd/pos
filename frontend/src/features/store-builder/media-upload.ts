@@ -17,7 +17,7 @@ export type DropTarget = 'image' | 'background'
 
 /** Why a file can't be used as a picture (null: fine). Mirrors the API's rules (JPEG, PNG, WebP, GIF up to 5 MB). */
 export function pictureFileProblem(file: { name: string; type: string; size: number }): string | null {
-  if (!MEDIA_ACCEPT.split(',').includes(file.type)) return `“${file.name}” isn’t a picture we can use. Use a JPEG, PNG, WebP or GIF file.`
+  if (!MEDIA_ACCEPT.split(',').includes(file.type)) return `“${file.name}” isn’t a picture we can use. Use a JPEG, PNG, WebP, GIF or AVIF file.`
   if (file.size > MEDIA_MAX_BYTES) return `“${file.name}” is larger than 5 MB. Make it smaller and try again.`
   return null
 }

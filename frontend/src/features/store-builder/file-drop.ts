@@ -6,7 +6,8 @@ import { buildElement } from './inspector/create-element'
 import { newItemId } from './inspector/b6-model'
 import type { ElementsMetadata } from './inspector/types'
 import { dropTargetOf, setNodePicture } from './media-upload'
-import { collectIds, findNode, insertElement, setNode } from './tree'
+import { allowedIn } from './document-kind'
+import { collectIds, findNode, insertElement, insertSection, newSectionFor, setNode } from './tree'
 
 /*
  * B21 pictures dragged from the computer onto the canvas (contract §4), after the upload: what the
@@ -115,6 +116,7 @@ export function applyDroppedPictures(
   ctx: { breakpoint: Breakpoint; registry: ElementsMetadata; context?: DocumentContext },
 ): DropOutcome {
   if (pictures.length === 0) return unchanged(content, 'No pictures to add.')
+  if (target.into === 'page') return newSectionOfPictures(content, target.index ?? content.sections.length, pictures, ctx)
   const info = findNode(content, target.node_id)
   if (!info) return unchanged(content, 'That part of the page is gone. Drop the pictures again.')
   const node = info.node
@@ -170,12 +172,52 @@ export function applyDroppedPictures(
     return { content: next, select: node.id, placed, note }
   }
 
-  // New picture elements in a column.
+  // New picture elements in a column; B22a: several in an empty column make one gallery.
   if (info.kind !== 'column') return unchanged(content, 'Drop the pictures between the parts of a section.')
+  if ((node as Column).elements.length === 0) {
+    const gallery = galleryOf(content, pictures, ctx)
+    if (gallery) {
+      const next = insertElement(content, gallery, { kind: 'column', columnId: node.id, index: 0 })
+      if (next !== content) return { content: next, select: gallery.id, placed: pictures.length, note: null }
+    }
+  }
   const added = insertPictures(content, node.id, target.before, target.index, pictures, ctx)
   if (added.ids.length === 0) return unchanged(content, 'There’s no room for more parts here. Drop the pictures somewhere else.')
   const note = added.ids.length < pictures.length ? `${plural(pictures.length - added.ids.length, 'picture', 'pictures')} didn’t fit here.` : null
   return { content: added.content, select: added.ids[0] ?? null, placed: added.ids.length, note }
+}
+
+/** B22a: several pictures as one new gallery element (null: one picture, or no gallery allowed here). */
+function galleryOf(content: BuilderContent, pictures: DroppedPicture[], ctx: { registry: ElementsMetadata; context?: DocumentContext }): Element | null {
+  if (pictures.length < 2) return null
+  const meta = ctx.registry.types?.find((t) => t.type === 'gallery')
+  if (ctx.context && !allowedIn(meta ?? { type: 'gallery' }, ctx.context)) return null
+  const element = buildElement('gallery', ctx.registry, collectIds(content), ctx.context)
+  if (!element) return null
+  const images: { id: string }[] = []
+  for (const picture of pictures.slice(0, LIST_MAX.gallery)) images.push(newListItem('gallery', newItemId(images), picture))
+  return { ...element, props: { ...(element.props as Record<string, unknown>), images } } as Element
+}
+
+/** B22a: pictures dropped on the empty canvas — a new section holding an image, or a gallery when several. */
+function newSectionOfPictures(
+  content: BuilderContent,
+  index: number,
+  pictures: DroppedPicture[],
+  ctx: { registry: ElementsMetadata; context?: DocumentContext },
+): DropOutcome {
+  const existing = collectIds(content)
+  const gallery = galleryOf(content, pictures, ctx)
+  const section = newSectionFor(gallery, existing)
+  let next = insertSection(content, section, index)
+  if (next === content) return unchanged(content, 'There’s no room for another section on this page.')
+  if (gallery) return { content: next, select: gallery.id, placed: pictures.length, note: null }
+  const columnId = section.columns[0]!.id
+  const added = insertPictures(next, columnId, null, 0, pictures, ctx)
+  next = added.content
+  if (added.ids.length === 0) return unchanged(content, 'There’s no room for more parts here. Drop the pictures somewhere else.')
+  const note = added.ids.length < pictures.length ? `${plural(pictures.length - added.ids.length, 'picture', 'pictures')} didn’t fit here.` : null
+  return { content: next, select: added.ids[0] ?? null, placed: added.ids.length, note }
 }
 
 const GALLERY_NOUN: Record<string, string> = { gallery: 'gallery', image_carousel: 'carousel', logo_carousel: 'logo carousel', photo_grid: 'photo grid', horizontal_gallery: 'gallery' }

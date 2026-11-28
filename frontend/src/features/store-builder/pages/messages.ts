@@ -274,7 +274,7 @@ const en = {
   // Header and footer
   'parts.listLabel': 'Header and footer',
   'parts.header': 'Header',
-  'parts.header.detail': 'The top of every page: logo, menu, search, account and cart. Phones keep the compact header.',
+  'parts.header.detail': 'The top of every page: logo, menu, search, account and cart. Phones show it in its phone layout.',
   'parts.header.classic': 'Using the standard header.',
   'parts.header.remove': 'Use the standard header',
   'parts.header.removeText': 'Your designed header, its draft and all its versions are deleted. The shop shows the standard header again (set on the Theme page).',
@@ -759,7 +759,7 @@ const bn: Record<MessageKey, string> = {
 
   'parts.listLabel': 'হেডার ও ফুটার',
   'parts.header': 'হেডার',
-  'parts.header.detail': 'প্রতিটি পেজের ওপরের অংশ: লোগো, মেনু, সার্চ, অ্যাকাউন্ট আর কার্ট। মোবাইলে ছোট হেডারটিই থাকবে।',
+  'parts.header.detail': 'প্রতিটি পেজের ওপরের অংশ: লোগো, মেনু, সার্চ, অ্যাকাউন্ট আর কার্ট। মোবাইলে এটি ফোনের লেআউটে দেখা যাবে।',
   'parts.header.classic': 'এখন সাধারণ হেডার চলছে।',
   'parts.header.remove': 'সাধারণ হেডার ব্যবহার করুন',
   'parts.header.removeText': 'আপনার ডিজাইন করা হেডার, এর ড্রাফট আর সব ভার্সন মুছে যাবে। দোকানে আবার সাধারণ হেডার দেখাবে (Theme পেজে সেট করা)।',

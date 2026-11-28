@@ -110,7 +110,8 @@ export function useDeletePageMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (id: string) => api.delete(`/cms/pages/${id}`),
+    // B22a: 200 `{design_removed}` (the page's builder design is deleted with it); an older 204 has no body.
+    mutationFn: (id: string) => api.delete<{ design_removed?: boolean } | undefined>(`/cms/pages/${id}`).then((r) => ({ designRemoved: r.data?.design_removed === true })),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['storefront', 'link-targets'] })
       return queryClient.invalidateQueries({ queryKey: contentKeys.pages })

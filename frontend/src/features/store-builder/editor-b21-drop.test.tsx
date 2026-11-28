@@ -2,9 +2,10 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { routes } from '@/app/routes'
 import { ApiError } from '@/lib/api/client'
-import { envelope, type CanvasMessage } from '@/storefront/builder/canvas/protocol'
+import { envelope, PAGE_DROP_ID, type CanvasMessage } from '@/storefront/builder/canvas/protocol'
 import { ELEMENT_REGISTRY } from '@/storefront/builder/registry'
 import { cloneSample } from '@/storefront/builder/test-payload'
+import type { BuilderContent } from '@/storefront/builder/types'
 import { bootstrapFixture } from '@/storefront/test-fixtures'
 import { makeCurrentUser } from '@/test/fixtures'
 import { mockApi, ok, renderRoutes } from '@/test/utils'
@@ -31,10 +32,10 @@ beforeEach(() => {
   })
 })
 
-function mockEditor() {
+function mockEditor(content: BuilderContent = cloneSample()) {
   mockApi({
     'GET /auth/me': ok(makeCurrentUser({ permissions: ['storefront.view', 'storefront.manage', 'storefront.publish', 'media.manage'] })),
-    'GET /storefront/builder/documents/doc-1': ok(detail(cloneSample(), 3)),
+    'GET /storefront/builder/documents/doc-1': ok(detail(content, 3)),
     'GET /storefront/builder/elements': ok({ types: ELEMENT_REGISTRY, limits: {}, enums: {} }),
     'GET /storefront/builder/canvas-context': ok({ bootstrap: bootstrapFixture(), store_url: 'https://shop.test', locales: ['en'] }),
     'POST /storefront/builder/resolve': ok({ data: {}, media: {}, errors: {} }),
@@ -47,9 +48,9 @@ function mockEditor() {
   })
 }
 
-async function openEditor() {
+async function openEditor(content?: BuilderContent) {
   const user = userEvent.setup()
-  mockEditor()
+  mockEditor(content)
   renderRoutes(routes, '/storefront/builder/doc-1')
   const frame = (await screen.findByTitle(/Page canvas/)) as HTMLIFrameElement
   const fromCanvas = (data: CanvasMessage) =>
@@ -138,5 +139,33 @@ describe('store builder editor (B21 pictures from the computer)', () => {
     fromCanvas({ type: 'drag-files', over: { node_id: 's_story', kind: 'background', rect: { x: 0, y: 0, w: 800, h: 400 } } })
     fromCanvas({ type: 'drag-files', over: null })
     expect(screen.queryByTestId('file-drop-mark')).toBeNull()
+  })
+})
+
+describe('store builder editor (B22a pictures on an empty page)', () => {
+  it('uploads with progress over the canvas, says why an AVIF was refused, and adds a new section with a gallery', async () => {
+    const { user, fromCanvas, undo } = await openEditor({ schema_version: 1, sections: [] })
+    let release: () => void = () => {}
+    upload.mockImplementationOnce(
+      (file: File, options: { onProgress?: (f: number) => void }) =>
+        new Promise((resolve) => {
+          options.onProgress?.(0.5)
+          release = () => resolve({ id: '0190a1c9-0000-7000-8000-0000000000b1', url: `/storage/media/${file.name}`, srcset: '', width: 1, height: 1, alt: null })
+        }),
+    )
+    upload.mockImplementationOnce(async () => {
+      throw new ApiError(422, 'UNSUPPORTED_IMAGE', 'AVIF pictures need AVIF support on the server — upload JPEG, PNG or WebP.')
+    })
+    const avif = new File(['avif'], 'summer.avif', { type: 'image/avif' })
+    fromCanvas({ type: 'drop-files', target: { node_id: PAGE_DROP_ID, kind: 'insert', into: 'page', index: 0, before: null }, files: [png('fresh-mango.png'), avif, png('red_saree.png')] })
+    const bar = await screen.findByRole('progressbar', { name: /Uploading fresh-mango.png \(1 of 3\)/ })
+    expect(bar).toHaveAttribute('aria-valuenow', '17')
+    await act(async () => release())
+    await waitFor(() => expect(layerNames()).toEqual(expect.arrayContaining([expect.stringMatching(/^Section/), expect.stringMatching(/^Gallery/)])))
+    expect(toasts.error).toHaveBeenCalledWith('“summer.avif” couldn’t be uploaded: AVIF pictures need AVIF support on the server — upload JPEG, PNG or WebP.')
+    expect(toasts.success).toHaveBeenCalledWith(expect.stringMatching(/^2 pictures added/))
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    await user.click(undo)
+    await waitFor(() => expect(screen.queryAllByRole('treeitem')).toHaveLength(0))
   })
 })

@@ -62,12 +62,12 @@ The no-code store builder (brief §14) is built into the existing POS and online
 
 ## 5. Known limitations
 
-- **Header on phones:** the builder header is used from 768 px; phones keep the store's compact header and drawer.
+- **Header on phones:** *fixed in B22a* — the designed header works on phones (compact row + menu drawer, or the phone design). Between 640 and 767 px a header with its own phone settings uses the phone order and menu button but tablet styles.
 - **Functional pages:** product, cart, checkout and account pages stay functional pages. They are customized through zones, theme settings and the header and footer, not freely.
 - **Brand templates:** the two brand templates have no screenshot, because the demo stores have no brands.
-- **Divider colour:** the divider's colour field in the Content tab uses the simple theme-colour select.
-- **Full width on smaller devices:** "Fill the column width" can't be turned off on a device that inherits 100 % width from a larger one.
-- **Deleted CMS pages:** deleting a CMS page leaves its builder design behind, listed without a page.
+- **Divider colour:** *fixed in B22a* (full colour control).
+- **Full width on smaller devices:** *fixed in B22a* (an explicit `auto` width per device).
+- **Deleted CMS pages:** *fixed in B22a* — the design is deleted with the page.
 - **Version restore:** restoring a version doesn't re-check the custom-HTML permission, because that HTML was allowed when it was saved.
 - **Open bug (not from the builder):** under heavy machine load, the admin *New product* form once lost typed prices and barcode after choosing a unit. It was not reproducible at normal load; to be investigated.
 

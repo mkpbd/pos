@@ -49,11 +49,13 @@ class MediaController
      * JPEG, PNG, WebP or GIF up to 5 MB and 6000 × 6000 px. Uploading identical bytes again returns
      * the existing item with status 200 instead of 201. B11: JPEG/PNG/WebP originals larger than
      * 2560 px on a side are stored scaled down (EXIF orientation applied, metadata stripped).
+     * B22a: AVIF too when the server's GD reads it (stored as uploaded, WebP renditions);
+     * otherwise 422 UNSUPPORTED_IMAGE.
      */
     public function store(Request $request, UploadMedia $upload): JsonResponse
     {
         $data = $request->validate([
-            'file' => ['required', 'file', 'image', 'mimes:jpeg,png,webp,gif', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
+            'file' => ['required', 'file', 'image', 'mimes:jpeg,png,webp,gif,avif', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
             'alt' => ['sometimes', 'nullable', 'string', 'max:200'],
         ]);
 

@@ -15,11 +15,11 @@ import { RichTextEditor } from '@/features/content/components/rich-text-editor'
 import { cn } from '@/lib/utils'
 import type { ButtonElement, Column, DividerElement, DocumentContext, HeadingElement, ImageElement, InnerRowElement, Section, SpacerElement, Style, TextElement } from '@/storefront/builder/types'
 import type { MediaRef } from '@/storefront/types'
-import type { PaletteColor } from '../controls'
+import { ColorControl, type PaletteColor } from '../controls'
 import { SectionShapeControl } from './b6-style'
 import { TextEffectForm } from './b18-text-effect-form'
 import { textEffectBanglaFields } from './b18-text-effect'
-import { FieldError, ImageChooser, LinkField, NodeBangla, ThemeColorField, type Errors } from './fields'
+import { FieldError, ImageChooser, LinkField, NodeBangla, type Errors } from './fields'
 import { COLUMN_PRESETS, currentPreset } from './tree-lookup'
 import { DIVIDER_THICKNESS, DIVIDER_WIDTH, TEXT_LIMITS } from './validate'
 import type { BuilderNode, ColumnPreset, InspectorChangeOptions, InspectorCommand } from './types'
@@ -217,7 +217,7 @@ export function ButtonForm({ node, onChange, errors, bangla, context }: FormProp
 
 const range = (min: number, max: number, step = 1) => Array.from({ length: Math.floor((max - min) / step) + 1 }, (_, i) => min + i * step)
 
-export function DividerForm({ node, onChange, errors }: FormProps<DividerElement>) {
+export function DividerForm({ node, onChange, errors, theme }: FormProps<DividerElement> & { theme?: { colors?: Record<string, string>; palette?: readonly PaletteColor[] } }) {
   const p = node.props
   const widths = [...new Set([...range(DIVIDER_WIDTH.min, DIVIDER_WIDTH.max, 10), p.width])].filter((n) => Number.isInteger(n)).sort((a, b) => a - b)
   return (
@@ -256,7 +256,19 @@ export function DividerForm({ node, onChange, errors }: FormProps<DividerElement
           </Select>
         </FormField>
       )}
-      <ThemeColorField label="Colour" value={p.color} onChange={(color) => setProps(node, onChange, { color }, 'color')} error={errors.color} />
+      {/* B22a: the full colour control (theme colours, palette, HEX, opacity), like the other colour fields. */}
+      <div className="flex flex-col gap-1">
+        <ColorControl
+          label="Colour"
+          value={p.color}
+          onChange={(color) => color !== null && setProps(node, onChange, { color }, 'color')}
+          themeColors={theme?.colors}
+          palette={theme?.palette}
+          allowTokens
+          allowAlpha
+        />
+        <FieldError message={errors.color} />
+      </div>
     </div>
   )
 }

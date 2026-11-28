@@ -39,6 +39,12 @@ export type DeviceOrderContext = { device: Device; order: DeviceOrder | null }
 
 export const DeviceOrderCtx = createContext<DeviceOrderContext>({ device: 'desktop', order: null })
 
+/**
+ * B22a: the header drawn in its phone layout (store below 768 px, the editor's Phone preview):
+ * menus show as a menu button opening a drawer, the search box as a search icon.
+ */
+export const PhoneHeaderCtx = createContext(false)
+
 /** The column an element sits in (image `sizes`). */
 export const ColumnWidthCtx = createContext<{ base: number; tablet?: number; mobile?: number }>({ base: 100 })
 

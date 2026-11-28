@@ -25,4 +25,10 @@ interface PageDesigns
      * staff member of this store holding storefront.view).
      */
     public function isDraftPreview(Request $request): bool;
+
+    /**
+     * B22a: deletes the page's builder design (with everything stored per design), audited;
+     * called inside the page delete's transaction. Whether there was one.
+     */
+    public function deleteForPage(string $pageId): bool;
 }
